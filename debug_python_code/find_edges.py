@@ -2,13 +2,18 @@ import cv2
 import matplotlib.pyplot as plt
 import os
 import numpy as np
+from sklearn.linear_model import LinearRegression, RANSACRegressor, Ridge
 
+# Load dataset
 example_files = os.listdir('./cyberzoo_poles_panels_mats/20190121-142935')
 example_files.sort()
 example_files = [os.path.join('./cyberzoo_poles_panels_mats/20190121-142935', filename) for filename in example_files]
-from sklearn.linear_model import LinearRegression, RANSACRegressor, Ridge
 
 def perform_linear_regression(binary_image):
+    """
+    Given a portion of the image we try to find the horizon
+    We use RANSACRegressor to try to be resiliant to the numerous outliers
+    """
     white_pixels = np.argwhere(binary_image == 255)  # Get coordinates of white pixels
     num_pixels = white_pixels.shape[0]
 
@@ -30,6 +35,9 @@ def perform_linear_regression(binary_image):
     return model
 
 def assign_colors_to_compatible_models(models, threshold = 20):
+    """
+    Just a quick clustering of the different predictions for the horizon
+    """
     color_map = {}
     color_index = 0
 
@@ -65,41 +73,36 @@ while not exit:
     frame  = cv2.imread(file)
     frame = cv2.rotate(frame, cv2.ROTATE_90_COUNTERCLOCKWISE)
     original = frame.copy()
+    
+    # This was an attempt to make the blue and black patches around the arena look the same (I wanted a gradient between the green and blue grass)
     #frame[:, :, 2] = 0
-    
     #hsv_image = cv2.cvtColor(frame, cv2.COLOR_BGR2HSV)
-
-    # Define lower and upper bounds for blue color in HSV
-    lower_blue = np.array([90, 0, 0])
-    upper_blue = np.array([255, 255, 255])
-    
-    # Create a mask to extract blue areas
-    blue_mask = cv2.inRange(frame, lower_blue, upper_blue)
-
-    # Print some information about the blue mask
-    print("Pixels detected as blue:", np.count_nonzero(blue_mask))
-    print("Shape of the blue mask:", blue_mask.shape)
-
-    
-    # Darken the blue areas in the original image
-    darkened_image = frame.copy()
-    #darkened_image[blue_mask != 0, 0] = 80   # Darken blue areas by dividing pixel values by 2
-    #darkened_image[blue_mask != 0, 1] = 60
-    
-    frame = darkened_image.copy()
+    ## Define lower and upper bounds for blue color in HSV
+    #lower_blue = np.array([90, 0, 0])
+    #upper_blue = np.array([255, 255, 255])
+    ## Create a mask to extract blue areas
+    #blue_mask = cv2.inRange(frame, lower_blue, upper_blue)
+    ## Print some information about the blue mask
+    #print("Pixels detected as blue:", np.count_nonzero(blue_mask))
+    #print("Shape of the blue mask:", blue_mask.shape)
+    ## Darken the blue areas in the original image
+    #darkened_image = frame.copy()
+    ##darkened_image[blue_mask != 0, 0] = 80   # Darken blue areas by dividing pixel values by 2
+    ##darkened_image[blue_mask != 0, 1] = 60
+    #frame = darkened_image.copy()
 
     # Convert the frame to grayscale for edge detection 
-    gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY) 
-        
+    gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)    
     # Apply Gaussian blur to reduce noise and smoothen edges 
     blurred = cv2.GaussianBlur(src=gray, ksize=(101, 101), sigmaX=0.5) 
-    
     # Perform Canny edge detection 
     edges = cv2.Canny(blurred,15, 20) 
     #edges = cv2.GaussianBlur(src=edges, ksize=(5, 5), sigmaX=0.25) 
     edges_debug = edges.copy()
     colored = cv2.cvtColor(edges_debug, cv2.COLOR_GRAY2BGR)
 
+    # Split the image in regions where we try to interpolate the horizon line
+    # Frame diveded in two to separate the two walls
     for offset in [0, edges.shape[1] // 2]:
         # Should be based on the corner position
         x_min = offset
@@ -126,6 +129,8 @@ while not exit:
                       (128, 0, 255), (255, 128, 128), (128, 255, 128), (128, 128, 255), (255, 255, 128)]
 
         
+        # We try to find the correct model by looking at how many points are on the line
+        # If there are too many points around the line we supose it is the mat and not the horizon
         for model, color, y in zip(models, color_map.values(), range(y_min, y_max, 10)):
             #x1 = 0
             #y1 = int(model.predict([[x1]])[0][0])
@@ -135,7 +140,7 @@ while not exit:
             #line_thickness = 2
             #cv2.line(colored, (x1, y1), (x2, y2), rgb_colors[color], line_thickness)
             #cv2.imshow(f"sample: {y}", sample)
-            
+
             for x in range(x_min, x_max, 5):
                 y_predicted = int(model.predict([[x]]).flatten()[0])
                 ys_actual_low = np.where(edges[y_predicted - 3:y_predicted + 3, x] == 255)[0]
@@ -153,7 +158,6 @@ while not exit:
             cv2.circle(colored, (x0, y0), 2, (0, 0, 255), -1)
 
     # I don't have the model anymore
-
     #cv2.imshow("sample", sample)
     #line_color = (255)  # Red color in BGR format
     #line_thickness = 2  # Adjust thickness as needed
