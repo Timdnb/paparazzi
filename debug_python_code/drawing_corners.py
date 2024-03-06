@@ -15,7 +15,8 @@ def Find_T_drone_org(roll, pitch, yaw, x, y, z):
     x = - x
     y = - y
     z = - z
-
+ 
+ 
     # Convert Euler angles to rotation matrices
     R_roll = np.array([[1, 0, 0],
                     [0, np.cos(roll), -np.sin(roll)],
@@ -75,17 +76,17 @@ def Find_T_camera_drone():
     return T_camera_drone
 
 
-def corners_coord_in_drone(corners_object, T_drone_org):
-    corners_drone = None   # calculate bounding box corners in drone frame
+# def corners_coord_in_drone(corners_object, T_drone_org):
+#     corners_drone = None   # calculate bounding box corners in drone frame
     
-    corners_drone = np.empty((4,4))\
+#     corners_drone = np.empty((4,4))\
     
-    for index, object in enumerate(corners_object):
-        corners_drone[index] = np.dot(T_drone_org, object.T)
+#     for index, object in enumerate(corners_object):
+#         corners_drone[index] = np.dot(T_drone_org, object.T)
         
-    assert corners_drone.shape == (4, 4)
+#     assert corners_drone.shape == (4, 4)
     
-    return corners_drone
+#     return corners_drone
 
 
 def project_points(projection_matrix, corners_drone):
@@ -108,10 +109,11 @@ def project_points(projection_matrix, corners_drone):
 
 
 
-#-------MAIN--------
+#---------------------------MAIN-----------------------------------------------------------------
+
 # projection matrix?
 # corners coordinates?
-# transaltion in a matrix? (possibly monius for rotation)
+# transaltion in a matrix? (possibly minus for rotation)
 
 #corner coordiantes in original frame
 cor_coord_org = np.array([[1,1,1,1],
@@ -157,11 +159,12 @@ for i in range(0, x_col.shape(0)):
     T_drone_org = Find_T_drone_org(roll_col[i], pitch_col[i], yaw_col[i], x_col[i], y_col[i], z_col[i])
 
     #Find corners coordinates in drone frame
-    cor_coord_drone = corners_coord_in_drone(cor_coord_org, T_drone_org)
+    # cor_coord_drone = corners_coord_in_drone(cor_coord_org, T_drone_org)
+    cor_coord_drone = np.dot(T_drone_org,cor_coord_org.T).T
 
     #Find 3D coordinates in camera frame
     T_camera_drone = Find_T_camera_drone
-    cor_coord_camera = np.dot(T_camera_drone,cor_coord_drone)
+    cor_coord_camera = np.dot(T_camera_drone,cor_coord_drone.T).T
 
     #Find corner pixel coordinates for the image 
     uvs_row = project_points(projection_matrix,cor_coord_camera)
