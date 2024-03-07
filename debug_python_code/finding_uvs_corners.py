@@ -101,8 +101,11 @@ def project_points(projection_matrix, corners_drone):
     
     coordinates = np.dot(projection_matrix, corners_drone.T).T
     coordinates = coordinates[:, :2] / coordinates[:, 2:] #normalisation
+    #giving uvs shape [4,2]
     uvs = coordinates[:, :2]
     uvs = np.round(uvs).astype(int)
+
+    # print("shape", uvs.shape)
     
     
     return uvs
@@ -116,15 +119,24 @@ def project_points(projection_matrix, corners_drone):
 # transaltion in a matrix? (possibly minus for rotation)
 
 #corner coordiantes in original frame
-cor_coord_org = np.array([[1,1,1,1],
-                          [2,3,4,1],
-                          [6,7,8,1],
-                          [9,10,11,1]])
-projection_matrix  = 0
+cor_coord_org = np.array([[4,4,0,1],
+                          [-4,-4,0,1],
+                          [4,-4,0,1],
+                          [-4,4,0,1]])
 
+projection_matrix  = np.array([[300,0,640,0],
+                               [0,300,640,0],
+                               [0,0,1,0],
+                               [0,0,0,1]])
+
+#this is experimental projecton matrix because the one above creates huge coordinates
+# projection_matrix  = np.array([[30,0,64,0],
+#                                [0,30,64,0],
+#                                [0,0,1,0],
+#                                [0,0,0,1]])
 
 # Replace 'file_path.csv' with the actual path to your CSV file
-file_path = 'debug_python_code/cyberzoo_poles_panels_mats/20190121-142943.csv'
+file_path = './cyberzoo_poles_panels_mats/20190121-142943.csv'
 
 # Read the CSV file into a DataFrame
 df = pd.read_csv(file_path)
@@ -150,24 +162,31 @@ yaw_col = df.iloc[:, 9]
 # z = 0
 
 #definig final array for corner pixel coordinates
-uvs = np.zeros((x_col.shape(0),2))
+uvs = np.zeros((x_col.shape[0],4, 2))
 
 
-for i in range(0, x_col.shape(0)):
+for i in range(0, x_col.shape[0]):
 
     #Find Transformation matrix from orginial frame to drone
     T_drone_org = Find_T_drone_org(roll_col[i], pitch_col[i], yaw_col[i], x_col[i], y_col[i], z_col[i])
 
     #Find corners coordinates in drone frame
     # cor_coord_drone = corners_coord_in_drone(cor_coord_org, T_drone_org)
-    cor_coord_drone = np.dot(T_drone_org,cor_coord_org.T).T
+    cor_coord_drone = np.dot(T_drone_org, cor_coord_org.T).T
 
     #Find 3D coordinates in camera frame
-    T_camera_drone = Find_T_camera_drone
-    cor_coord_camera = np.dot(T_camera_drone,cor_coord_drone.T).T
+    T_camera_drone = Find_T_camera_drone()
+    cor_coord_camera = np.dot(T_camera_drone, cor_coord_drone.T).T
 
     #Find corner pixel coordinates for the image 
     uvs_row = project_points(projection_matrix,cor_coord_camera)
 
-    uvs[i] = uvs_row
+    uvs[i,:,:] = uvs_row
 
+
+    #for testing save every 12 datapoint
+    uvs_testing = uvs[::12]
+    # Save the array to the specified file path
+    np.save("./saved_numpy.npy", uvs_testing)
+
+print(uvs[1])
