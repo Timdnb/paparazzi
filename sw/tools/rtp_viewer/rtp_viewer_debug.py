@@ -50,9 +50,9 @@ class RtpViewer:
             # Quit if frame could not be retrieved
             if not ret:
                 break
-            
-            self.frame = draw_3D_to_2D(self.frame)
+
             # Run the computer vision function
+            self.frame = parse(self.frame)
             self.cv()
 
             # Process key input
@@ -123,133 +123,204 @@ class RtpViewer:
         # Shutdown ivy interface
         self.ivy.shutdown()
 
+import cv2
+import matplotlib.pyplot as plt
+import os
 import numpy as np
-def Find_T_drone_org(roll, pitch, yaw, x, y, z):
+from sklearn.linear_model import LinearRegression, RANSACRegressor, Ridge
+import copy
+import numpy as np
 
-    #because input is expressed as rotation and translation from original to drone we need to
-    #add minus in front so that we actually know what should be the coordinates in the drone frame 
-    #if the points were transformed from drone to original frame. Thus we can know that the drone
-    #would see in its frame
 
-    roll = -roll
-    pitch = -pitch
-    yaw = - yaw
-    x = - x
-    y = - y
-    z = - z
- 
- 
-    # Convert Euler angles to rotation matrices
-    R_roll = np.array([[1, 0, 0],
-                    [0, np.cos(roll), -np.sin(roll)],
-                    [0, np.sin(roll), np.cos(roll)]])
-
-    R_pitch = np.array([[np.cos(pitch), 0, np.sin(pitch)],
-                        [0, 1, 0],
-                        [-np.sin(pitch), 0, np.cos(pitch)]])
-
-    R_yaw = np.array([[np.cos(yaw), -np.sin(yaw), 0],
-                    [np.sin(yaw), np.cos(yaw), 0],
-                    [0, 0, 1]])
-
-    # Combine individual rotation matrices to obtain the overall rotation matrix
-    rotation_matrix = np.dot(np.dot(R_yaw, R_pitch), R_roll)
+def remove_mess(image, window_size=10, thresh=.4):
+    pixels_threshold = window_size**2 * thresh
+    for y in range(0, image.shape[0] - window_size + 1, window_size):
+        for x in range(0, image.shape[1] - window_size + 1, window_size):
+            
+            roi = image[y:y+window_size, x:x+window_size]
+            
+            # Count white pixels 
+            white_pixels = np.sum(roi == [255, 255, 255])
+            
+            # If there are 20 or more white pixels, replace the entire ROI with black pixels
+            if white_pixels >= pixels_threshold:
+                image[y:y+window_size, x:x+window_size] = [0, 0, 0]
+                # print("Removed patch")
+    return image
     
-    # rotation_matrix = np.dot(R_pitch, np.dot(R_yaw, R_roll))
-    # print(rotation_matrix)
-
-    # Translation vector representing displacement between the origins of the frames
-    # so that the croners are expressed in coordinates of drone frame
-    translation_vector = np.array([x, y, z])  
-
-    # Homogeneous transformation matrix
-    homogeneous_matrix = np.eye(4)
-    homogeneous_matrix[:3, :3] = rotation_matrix
-    homogeneous_matrix[:3, 3] = translation_vector
-    homogeneous_matrix[3, :] = np.array([0,0,0,1])
-    
-    T_drone_org = homogeneous_matrix
-
-    # T_drone_org = np.eye(4)
-    
-    return T_drone_org
-
-
-def Find_T_camera_drone():
-
-    #minus because we go back to give coordinates in camera frame for points positioned as in 
-    #drone frame
-
-    # y_rot = - np.radians(90)
-    z_rot = - np.radians(90)
-
-    x_rot =  - np.radians(90)
-    
-
-    # Convert Euler angles to rotation matrices
-    R_roll = np.array([[1, 0, 0],
-                [0, np.cos(x_rot), -np.sin(x_rot)],
-                [0, np.sin(x_rot), np.cos(x_rot)]])
-
-    # R_pitch = np.array([[np.cos(y_rot), 0, np.sin(y_rot)],
-    #                     [0, 1, 0],
-    #                     [-np.sin(y_rot), 0, np.cos(y_rot)]])
-    
-    R_yaw = np.array([[np.cos(z_rot), -np.sin(z_rot), 0],
-                    [np.sin(z_rot), np.cos(z_rot), 0],
-                    [0, 0, 1]])
-    
-    #Find correct order for rotations
-    rotation_matrix = np.dot( R_yaw , R_roll)
-    
-
-    #forming homogenous matrix, no translation
-
-    homogeneous_matrix = np.zeros([4,4])
-    homogeneous_matrix[:3, :3] = rotation_matrix
-    homogeneous_matrix[3, :] = np.array([0,0,0,1])
-
-    T_camera_drone = homogeneous_matrix
-
-    return T_camera_drone
-
-
-
-def project_points(projection_matrix, corners_drone):
+def perform_linear_regression(binary_image):
     """
-    projection_matrix: The projection matrix based on the intrinsic camera calibration.
-    points: Nx[x,y,z,1.0] np.array of the points that need to be projected to the camera image from drone frame.
-    return: Nx[u,v] rounded coordinates of the points in the camera image as int data type.
+    Given a portion of the image we try to find the horizon
+    We use RANSACRegressor to try to be resiliant to the numerous outliers
     """
-    assert corners_drone.shape[-1] == 4
-    uvs = None   # calculate points in image plane
+    white_pixels = np.argwhere(binary_image == 255)  # Get coordinates of white pixels
+    num_pixels = white_pixels.shape[0]
+
+
+    # Initialize arrays to store x and y coordinates of white pixels
+    x_coords = white_pixels[:, 1]
+    y_coords = white_pixels[:, 0]
+
+    # Perform linear regression on the coordinates
+    #base_estimator = Ridge(alpha=100)
+    #model = RANSACRegressor(base_estimator=base_estimator)
+    model = RANSACRegressor()
+    #model = LinearRegression()
+    if num_pixels < 2:
+        print("No white pixels found in the image.")
+        model.fit([[0], [1]], [[0], [0]])
+    else:
+        model.fit(x_coords.reshape(-1, 1), y_coords.reshape(-1, 1))
+    return model
+
+def assign_colors_to_compatible_models(models, threshold = 20):
+    """
+    Just a quick clustering of the different predictions for the horizon
+    """
+    color_map = {}
+    color_index = 0
+
+    for i in range(len(models)):
+        compatible = np.full(color_index, 0)
+        for j in range(i):
+
+            model1 = models[i]
+            model2 = models[j]
+
+            y_pred_1 = model1.predict([[300]])[0]
+            y_pred_2 = model2.predict([[300]])[0]
+            error = abs(y_pred_1 - y_pred_2)
+            compatible[color_map[j]] = max(error, compatible[color_map[j]])
+            
+        if compatible.size == 0 or all(compatible >= threshold):
+            color_map[i] = color_index
+            color_index += 1
+        else:
+            color_map[i] = np.argmin(compatible)
+
+    return color_map
+
+def detect_horizons(frame):
+    """
+    Return the model for each orizon line up to two, and the x for which they meet
+    If there is only one line x_separation is equal to frame.shape[1]
+    """
+    original = frame.copy()
     
-    coordinates = np.dot(projection_matrix, corners_drone.T).T
-    coordinates = coordinates[:, :2] / coordinates[:, 2:] #normalisation
+    # This was an attempt to make the blue and black patches around the arena look the same (I wanted a gradient between the green and blue grass)
+    #frame[:, :, 2] = 0
+    #hsv_image = cv2.cvtColor(frame, cv2.COLOR_BGR2HSV)
+    ## Define lower and upper bounds for blue color in HSV
+    #lower_blue = np.array([90, 0, 0])
+    #upper_blue = np.array([255, 255, 255])
+    ## Create a mask to extract blue areas
+    #blue_mask = cv2.inRange(frame, lower_blue, upper_blue)
+    ## Print some information about the blue mask
+    #print("Pixels detected as blue:", np.count_nonzero(blue_mask))
+    #print("Shape of the blue mask:", blue_mask.shape)
+    ## Darken the blue areas in the original image
+    #darkened_image = frame.copy()
+    ##darkened_image[blue_mask != 0, 0] = 80   # Darken blue areas by dividing pixel values by 2
+    ##darkened_image[blue_mask != 0, 1] = 60
+    #frame = darkened_image.copy()
 
-    #giving uvs shape [4,2]
-    uvs = coordinates[:, :2]
-    uvs = np.round(uvs).astype(int)
+    # Convert the frame to grayscale for edge detection 
+    gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)    
+    # Apply Gaussian blur to reduce noise and smoothen edges 
+    blurred = cv2.GaussianBlur(src=gray, ksize=(15, 15), sigmaX=0.9) 
+    # Perform Canny edge detection 
+    edges = cv2.Canny(blurred,15, 20) 
+    #edges = cv2.GaussianBlur(src=edges, ksize=(5, 5), sigmaX=0.9) 
+    rgb_edges = cv2.cvtColor(edges, cv2.COLOR_GRAY2BGR)
+    edges = remove_mess(rgb_edges)
+    edges = cv2.cvtColor(edges, cv2.COLOR_BGR2GRAY)
+    edges_debug = edges.copy()
+    colored = cv2.cvtColor(edges_debug, cv2.COLOR_GRAY2BGR)
     
-    return uvs
+    
+    # Split the image in regions where we try to interpolate the horizon line
+    # Frame diveded in two to separate the two walls
+    horizons = []
+    for offset in [0, edges.shape[1] // 2]:
+        # Should be based on the corner position
+        x_min = offset
+        x_max = offset+edges.shape[1] // 2
+        wrong = []
+        models = []
+        #y_min = 80
+        #y_max = edges.shape[0] - 40
+        y_min = 110
+        y_max = 200 - 40
+        for y in range(y_min, y_max, 10):
+            #sample = copy.deepcopy(edges[y:y+50, x_min:x_max])
+            sample = edges[y:y+50, x_min:x_max]
 
-#camera projection matrix 
-projection_matrix  = np.array([[30,0,120,0],
-                               [0,30,260,0],
-                               [0,0,1,0],
-                               [0,0,0,1]])
+            model = perform_linear_regression(sample)
+            model.estimator_.intercept_[0] = model.predict([[- x_min]])[0] + y
+            #model.intercept_[0] += y
+            models.append(model)
 
-def draw_3D_to_2D(frame):
-    T_drone_org = np.eye(4)
-    cor_coord_drone = np.dot(T_drone_org, np.array([2, 1, 0, 1]).T).T
-    T_camera_drone = Find_T_camera_drone()
-    cor_coord_camera = np.dot(T_camera_drone, cor_coord_drone.T).T
-    uv= project_points(projection_matrix,cor_coord_camera)[:2]
-    print(uv)
-    y, x = 240- int(uv[0]), int(uv[1])  # Assuming uvs contains (x, y) coordinates
-    # y, x = int(220), int(400)
-    cv2.circle(frame, (y, x), 5, (0, 0, 255), -1)  # Draw a circle with radius 5 and red color
-    return frame
+        color_map = assign_colors_to_compatible_models(models)
+        #print(color_map)
+        #print([list(color_map.values()).count(x) for x in color_map.values()])
+        rgb_colors = [(255, 0, 0), (0, 255, 0), (0, 0, 255), (255, 255, 0), (0, 255, 255),
+                      (255, 0, 255), (128, 128, 0), (128, 0, 128), (0, 128, 128), (128, 128, 128),
+                      (255, 128, 0), (255, 0, 128), (0, 255, 128), (128, 255, 0), (0, 128, 255),
+                      (128, 0, 255), (255, 128, 128), (128, 255, 128), (128, 128, 255), (255, 255, 128)]
+
+        
+        # We try to find the correct model by looking at how many points are on the line
+        # If there are too many points around the line we supose it is the mat and not the horizon
+        for model, color, y in zip(models, color_map.values(), range(y_min, y_max, 10)):
+            #x1 = x_min
+            #y1 = int(model.predict([[x1]])[0][0])
+            #x2 = x_max - 1
+            #y2 = int(model.predict([[x2]])[0][0])
+            ##print((x1, y1), (x2, y2))
+            ## Draw the regression line on the image
+            #line_thickness = 1
+            #cv2.line(colored, (x1, y1), (x2, y2), (0, 0, 128), line_thickness)
+            # if x_min == 0:
+            #     cv2.imshow(f"sample: {y}", sample)
+            #assert (sample != edges[y:y+50, x_min:x_max]).any()
+            model.wrong = []
+            for x in range(x_min, x_max, 5):
+                y_predicted = int(model.predict([[x]]).flatten()[0])
+                ys_actual_low = np.where(edges[y_predicted - 3:y_predicted + 3, x] == 255)[0]
+                ys_actual_high = np.where(edges[y_predicted - 5:y_predicted + 10, x] == 255)[0]
+                if len(ys_actual_low) == 0 or len(ys_actual_high) > 2:
+                    model.wrong.append((x, int(y_predicted)))
+        
+            #print(y, len(model.wrong))
+        horizons.append(min(models, key = lambda model: len(model.wrong)))
+    return horizons, edges.shape[1] // 2, colored
+
+def parse(frame):
+    frame = cv2.rotate(frame, cv2.ROTATE_90_COUNTERCLOCKWISE)
+    models, x_separation, colored = detect_horizons(frame)
+    
+    assert len(models) == 2 if x_separation < frame.shape[1] else len(models) == 1
+
+    for k, model in enumerate(models):
+        for x in range([0, x_separation][k], [frame.shape[1] // 2 - x_separation, frame.shape[1] // 2][k], 5):
+            y_predicted = int(model.predict([[x]]).flatten()[0])
+            ys_actual_low = np.where(edges[y_predicted - 3:y_predicted + 3, x] == 255)[0]
+            ys_actual_high = np.where(edges[y_predicted - 5:y_predicted + 10, x] == 255)[0]
+            if len(ys_actual_low) == 0 or len(ys_actual_high) > 2:
+                wrong.append((x, int(y_predicted)))
+        
+        
+        for x0, y0 in model.wrong:
+            cv2.circle(colored, (x0, y0), 2, (0, 0, 255), -1)
+
+    # I don't have the model anymore
+    #cv2.imshow("sample", sample)
+    #line_color = (255)  # Red color in BGR format
+    #line_thickness = 2  # Adjust thickness as needed
+    #cv2.line(edges, (0, 110+model.intercept_), (edges.shape[1], j), line_color, line_thickness)
+
+    combined_image = cv2.hconcat([colored, frame])
+    return combined_image
 
 if __name__ == '__main__':
     import sys
@@ -274,3 +345,4 @@ if __name__ == '__main__':
 
     viewer.run()
     viewer.cleanup()
+
