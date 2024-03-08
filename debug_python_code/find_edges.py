@@ -76,10 +76,8 @@ def perform_linear_regression_with_guess(binary_image, model):
     """
     white_pixels = np.argwhere(binary_image == 255)  # Get coordinates of white pixels
     num_pixels = white_pixels.shape[0]
-    new_image = np.zeros(binary_image.shape)
-
-
-
+    #new_image = np.zeros(binary_image.shape)
+    
     # Initialize arrays to store x and y coordinates of white pixels
     x_coords = white_pixels[:, 1]
     y_coords = white_pixels[:, 0]
@@ -95,32 +93,35 @@ def perform_linear_regression_with_guess(binary_image, model):
         if x == possible_x:
             list_y.append(y)
             continue
-            
+            perform_linear_regression_with_guess
         if possible_x is not None:
             prediction = model.predict([[possible_x]])[0]
-            try:
-                new_image[int(prediction) + ACCEPT_REGION, possible_x] = 255
-            except:
-                pass
-            new_image[int(prediction) - ACCEPT_REGION, possible_x] = 255
+            #try:
+            #    new_image[int(prediction) + ACCEPT_REGION*5, possible_x] = 255
+            #except:
+            #    pass
+            #try:
+            #    new_image[int(prediction) - ACCEPT_REGION*5, possible_x] = 255
+            #except:
+            #    pass
             distance = ACCEPT_REGION * 5 + 1
             for old_y in list_y:
                 if abs(old_y - prediction) < distance:
                     closest_y = old_y
                     distance = abs(old_y - prediction)
             if distance <= ACCEPT_REGION * 5:
-                new_image[closest_y, possible_x] = 255
+                #new_image[closest_y, possible_x] = 255
                 new_x.append(x)
                 new_y.append(closest_y)
             
         possible_x = x
         list_y = [y]
 
-    cv2.imshow("test", new_image)
-
+    #cv2.imshow(f"test {int(model.intercept_[0])}", new_image)
+    #cv2.waitKey(0)
 
     if len(new_x) < 2:
-        print("No white pixels found in the image.")
+        #print("No white pixels found in the image.")
         return model
     model = LinearRegression()
     model.fit(np.array(new_x).reshape(-1, 1), np.array(new_y).reshape(-1, 1))
@@ -134,7 +135,7 @@ def perform_linear_regression_with_guess(binary_image, model):
             new_new_y.append(y)
         
     if len(new_new_x) < 2:
-        print("No white pixels found in the image.")
+        #print("No white pixels found in the image.")
         return model
     new_model = LinearRegression()
     new_model.fit(np.array(new_new_x).reshape(-1, 1), np.array(new_new_y).reshape(-1, 1))
@@ -209,26 +210,35 @@ def detect_horizons(frame):
     # Split the image in regions where we try to interpolate the horizon line
     # Frame diveded in two to separate the two walls
     horizons = []
-    for offset in [edges.shape[1] // 2]: #[0, edges.shape[1] // 2]:
+    for offset in [0, edges.shape[1] // 2]:
         # Should be based on the corner position
         x_min = offset
         x_max = offset+edges.shape[1] // 2
         wrong = []
         models = []
         #y_min = 80
-        y_max = edges.shape[0] - 30
-        y_min = 110
+        y_min = 130
+        y_max = 210
         #y_max = 200 - 40
-        for y in range(y_min, y_max, 10):
+        if offset == 0:
+            angle = 2/3
+        else:
+            angle = -1/4
+        for y in range(y_min, y_max, 30):
             #sample = copy.deepcopy(edges[y:y+50, x_min:x_max])
-            sample = edges[y:y+50, x_min:x_max]
+            guess = LinearRegression()
+            if x_min == 0:
+                guess.fit([[0], [x_max - x_min]], [[y + angle * (x_max - x_min)], [y]])
+            else:
+                guess.fit([[0], [x_max - x_min]], [[y], [y - angle * (x_max - x_min)]])
+            model = perform_linear_regression_with_guess(edges[:, x_min:x_max], guess)
+            #sample = edges[y:y+50, x_min:x_max]
 
-            model = perform_linear_regression(sample)
+            #model = perform_linear_regression(sample)
             if model is None:
                 continue
             #model.estimator_.intercept_[0] = model.predict([[- x_min]])[0] + y
-            model.intercept_[0] = model.predict([[- x_min]])[0] + y
-            #model.intercept_[0] += y
+            model.intercept_[0] = model.predict([[- x_min]])[0]# + y
             models.append(model)
 
         color_map = assign_colors_to_compatible_models(models)
@@ -257,6 +267,8 @@ def detect_horizons(frame):
             model.wrong = []
             for x in range(x_min, x_max, 5):
                 y_predicted = int(model.predict([[x]]).flatten()[0])
+                if y_predicted > edges.shape[0]:
+                    break
                 ys_actual_low = np.where(edges[y_predicted - 3:y_predicted + 3, x] == 255)[0]
                 ys_actual_high = np.where(edges[y_predicted - 5:y_predicted + 10, x] == 255)[0]
                 if len(ys_actual_low) == 0 or len(ys_actual_high) > 2:
@@ -264,17 +276,19 @@ def detect_horizons(frame):
         
             #print(y, len(model.wrong))
         old_model = min(models, key = lambda model: len(model.wrong))
-        old_model.color = (0, 0, 255)
+        old_model.color = (0, 0, 100)
         guess = old_model
         guess.intercept_[0] = old_model.predict([[x_min]])[0]
         model = perform_linear_regression_with_guess(edges[:, x_min:x_max], guess)
         model.intercept_[0] = model.predict([[- x_min]])[0]
         model.wrong = []
         model.color = model.color = (0, 255, 0)
-        for x in range(x_min, x_max, 5):
+        for x in range(x_min, x_max, 2):
             y_predicted = int(model.predict([[x]]).flatten()[0])
-            ys_actual_low = np.where(edges[y_predicted - 3:y_predicted + 3, x] == 255)[0]
-            ys_actual_high = np.where(edges[y_predicted - 5:y_predicted + 10, x] == 255)[0]
+            if y_predicted > edges.shape[0]:
+                    continue
+            ys_actual_low = np.where(edges[y_predicted - 5:y_predicted + 5, x] == 255)[0]
+            ys_actual_high = np.where(edges[y_predicted - 10:y_predicted + 10, x] == 255)[0]
             if len(ys_actual_low) == 0 or len(ys_actual_high) > 2:
                 model.wrong.append((x, int(y_predicted)))
         horizons.append([old_model, model])
@@ -282,7 +296,7 @@ def detect_horizons(frame):
 
 
 exit = False
-i = 250
+i = 195
 j = 100
 window_name = "Original vs Edge Detected"
 cv2.namedWindow(window_name)
@@ -296,6 +310,7 @@ while not exit:
     #assert len(models) == 2 if x_separation < frame.shape[1] else len(models) == 1
 
     for _models in models:
+        #    model = _models[1]
         for model in _models:
             for x0, y0 in model.wrong:
                 cv2.circle(colored, (x0, y0), 2, model.color, -1)
