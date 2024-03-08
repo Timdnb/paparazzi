@@ -12,6 +12,7 @@ example_files.sort()
 example_files = [os.path.join('./cyberzoo_poles_panels_mats/20190121-142935', filename) for filename in example_files]
 
 def perform_linear_regression(binary_image):
+    ACCEPT_REGION = 10
     """
     Given a portion of the image we try to find the horizon
     We use RANSACRegressor to try to be resiliant to the numerous outliers
@@ -23,17 +24,47 @@ def perform_linear_regression(binary_image):
     # Initialize arrays to store x and y coordinates of white pixels
     x_coords = white_pixels[:, 1]
     y_coords = white_pixels[:, 0]
+    sorted_indices = np.argsort(x_coords)
+    x_coords_sorted = x_coords[sorted_indices]
+    y_coords_sorted = y_coords[sorted_indices]
+
 
     # Perform linear regression on the coordinates
     #base_estimator = Ridge(alpha=100)
     #model = RANSACRegressor(base_estimator=base_estimator)
-    model = RANSACRegressor()
-    #model = LinearRegression()
+    #model = RANSACRegressor()
+    model = LinearRegression()
     if num_pixels < 2:
         print("No white pixels found in the image.")
-        model.fit([[0], [1]], [[0], [0]])
-    else:
-        model.fit(x_coords.reshape(-1, 1), y_coords.reshape(-1, 1))
+        return None
+    model.fit(x_coords.reshape(-1, 1), y_coords.reshape(-1, 1))
+    new_x = []
+    new_y = []
+    possible_x = None
+    for x, y in zip(x_coords, y_coords):
+        if x == possible_x:
+            list_y.append(y)
+            continue
+            
+        if possible_x is not None:
+            prediction = model.predict([[possible_x]])[0]
+            closest_y = prediction + ACCEPT_REGION + 1
+            for old_y in list_y:
+                if abs(old_y - prediction) < abs(closest_y - prediction):
+                    closest_y = old_y
+            if abs(closest_y - prediction) <= ACCEPT_REGION:
+                new_x.append(x)
+                new_y.append(closest_y)
+
+        possible_x = x
+        list_y = [y]
+
+    model = LinearRegression()
+    if len(new_x) < 2:
+        print("No white pixels found in the image.")
+        return None
+    model.fit(np.array(new_x).reshape(-1, 1), np.array(new_y).reshape(-1, 1))
+
     return model
 
 def assign_colors_to_compatible_models(models, threshold = 20):
@@ -111,15 +142,18 @@ def detect_horizons(frame):
         wrong = []
         models = []
         #y_min = 80
-        #y_max = edges.shape[0] - 40
+        y_max = edges.shape[0] - 30
         y_min = 110
-        y_max = 200 - 40
+        #y_max = 200 - 40
         for y in range(y_min, y_max, 10):
             #sample = copy.deepcopy(edges[y:y+50, x_min:x_max])
             sample = edges[y:y+50, x_min:x_max]
 
             model = perform_linear_regression(sample)
-            model.estimator_.intercept_[0] = model.predict([[- x_min]])[0] + y
+            if model is None:
+                continue
+            #model.estimator_.intercept_[0] = model.predict([[- x_min]])[0] + y
+            model.intercept_[0] = model.predict([[- x_min]])[0] + y
             #model.intercept_[0] += y
             models.append(model)
 
