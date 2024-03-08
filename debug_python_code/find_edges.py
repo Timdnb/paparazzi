@@ -25,8 +25,8 @@ def perform_linear_regression(binary_image):
     x_coords = white_pixels[:, 1]
     y_coords = white_pixels[:, 0]
     sorted_indices = np.argsort(x_coords)
-    x_coords_sorted = x_coords[sorted_indices]
-    y_coords_sorted = y_coords[sorted_indices]
+    x_coords = x_coords[sorted_indices]
+    y_coords = y_coords[sorted_indices]
 
 
     # Perform linear regression on the coordinates
@@ -35,9 +35,10 @@ def perform_linear_regression(binary_image):
     #model = RANSACRegressor()
     model = LinearRegression()
     if num_pixels < 2:
-        print("No white pixels found in the image.")
         return None
     model.fit(x_coords.reshape(-1, 1), y_coords.reshape(-1, 1))
+    return model
+
     new_x = []
     new_y = []
     possible_x = None
@@ -64,6 +65,79 @@ def perform_linear_regression(binary_image):
         print("No white pixels found in the image.")
         return None
     model.fit(np.array(new_x).reshape(-1, 1), np.array(new_y).reshape(-1, 1))
+
+    return model
+
+def perform_linear_regression_with_guess(binary_image, model):
+    ACCEPT_REGION = 5
+    """
+    Given a portion of the image we try to find the horizon
+    We use RANSACRegressor to try to be resiliant to the numerous outliers
+    """
+    white_pixels = np.argwhere(binary_image == 255)  # Get coordinates of white pixels
+    num_pixels = white_pixels.shape[0]
+    new_image = np.zeros(binary_image.shape)
+
+
+
+    # Initialize arrays to store x and y coordinates of white pixels
+    x_coords = white_pixels[:, 1]
+    y_coords = white_pixels[:, 0]
+    sorted_indices = np.argsort(x_coords)
+    x_coords = x_coords[sorted_indices]
+    y_coords = y_coords[sorted_indices]
+
+    
+    new_x = []
+    new_y = []
+    possible_x = None
+    for x, y in zip(x_coords, y_coords):
+        if x == possible_x:
+            list_y.append(y)
+            continue
+            
+        if possible_x is not None:
+            prediction = model.predict([[possible_x]])[0]
+            try:
+                new_image[int(prediction) + ACCEPT_REGION, possible_x] = 255
+            except:
+                pass
+            new_image[int(prediction) - ACCEPT_REGION, possible_x] = 255
+            distance = ACCEPT_REGION * 5 + 1
+            for old_y in list_y:
+                if abs(old_y - prediction) < distance:
+                    closest_y = old_y
+                    distance = abs(old_y - prediction)
+            if distance <= ACCEPT_REGION * 5:
+                new_image[closest_y, possible_x] = 255
+                new_x.append(x)
+                new_y.append(closest_y)
+            
+        possible_x = x
+        list_y = [y]
+
+    cv2.imshow("test", new_image)
+
+
+    if len(new_x) < 2:
+        print("No white pixels found in the image.")
+        return model
+    model = LinearRegression()
+    model.fit(np.array(new_x).reshape(-1, 1), np.array(new_y).reshape(-1, 1))
+
+    new_new_x = []
+    new_new_y = []
+    for x, y in zip(new_x, new_y):
+        prediction = model.predict([[possible_x]])[0]
+        if abs(y - prediction) <= ACCEPT_REGION:
+            new_new_x.append(x)
+            new_new_y.append(y)
+        
+    if len(new_new_x) < 2:
+        print("No white pixels found in the image.")
+        return model
+    new_model = LinearRegression()
+    new_model.fit(np.array(new_new_x).reshape(-1, 1), np.array(new_new_y).reshape(-1, 1))
 
     return model
 
@@ -135,7 +209,7 @@ def detect_horizons(frame):
     # Split the image in regions where we try to interpolate the horizon line
     # Frame diveded in two to separate the two walls
     horizons = []
-    for offset in [0, edges.shape[1] // 2]:
+    for offset in [edges.shape[1] // 2]: #[0, edges.shape[1] // 2]:
         # Should be based on the corner position
         x_min = offset
         x_max = offset+edges.shape[1] // 2
@@ -189,7 +263,21 @@ def detect_horizons(frame):
                     model.wrong.append((x, int(y_predicted)))
         
             #print(y, len(model.wrong))
-        horizons.append(min(models, key = lambda model: len(model.wrong)))
+        old_model = min(models, key = lambda model: len(model.wrong))
+        old_model.color = (0, 0, 255)
+        guess = old_model
+        guess.intercept_[0] = old_model.predict([[x_min]])[0]
+        model = perform_linear_regression_with_guess(edges[:, x_min:x_max], guess)
+        model.intercept_[0] = model.predict([[- x_min]])[0]
+        model.wrong = []
+        model.color = model.color = (0, 255, 0)
+        for x in range(x_min, x_max, 5):
+            y_predicted = int(model.predict([[x]]).flatten()[0])
+            ys_actual_low = np.where(edges[y_predicted - 3:y_predicted + 3, x] == 255)[0]
+            ys_actual_high = np.where(edges[y_predicted - 5:y_predicted + 10, x] == 255)[0]
+            if len(ys_actual_low) == 0 or len(ys_actual_high) > 2:
+                model.wrong.append((x, int(y_predicted)))
+        horizons.append([old_model, model])
     return horizons, edges.shape[1] // 2, colored
 
 
@@ -205,19 +293,12 @@ while not exit:
     frame = cv2.rotate(frame, cv2.ROTATE_90_COUNTERCLOCKWISE)
     models, x_separation, colored = detect_horizons(frame)
     
-    assert len(models) == 2 if x_separation < frame.shape[1] else len(models) == 1
+    #assert len(models) == 2 if x_separation < frame.shape[1] else len(models) == 1
 
-    for k, model in enumerate(models):
-        for x in range([0, x_separation][k], [frame.shape[1] // 2 - x_separation, frame.shape[1] // 2][k], 5):
-            y_predicted = int(model.predict([[x]]).flatten()[0])
-            ys_actual_low = np.where(edges[y_predicted - 3:y_predicted + 3, x] == 255)[0]
-            ys_actual_high = np.where(edges[y_predicted - 5:y_predicted + 10, x] == 255)[0]
-            if len(ys_actual_low) == 0 or len(ys_actual_high) > 2:
-                wrong.append((x, int(y_predicted)))
-        
-        
-        for x0, y0 in model.wrong:
-            cv2.circle(colored, (x0, y0), 2, (0, 0, 255), -1)
+    for _models in models:
+        for model in _models:
+            for x0, y0 in model.wrong:
+                cv2.circle(colored, (x0, y0), 2, model.color, -1)
 
     # I don't have the model anymore
     #cv2.imshow("sample", sample)
