@@ -3,6 +3,7 @@ import matplotlib.pyplot as plt
 import os
 import numpy as np
 from sklearn.linear_model import LinearRegression, RANSACRegressor, Ridge
+from utils import *
 
 # Load dataset
 example_files = os.listdir('./cyberzoo_poles_panels_mats/20190121-142935')
@@ -63,7 +64,7 @@ def assign_colors_to_compatible_models(models, threshold = 20):
 
 
 exit = False
-i = 341
+i = 100
 j = 100
 window_name = "Original vs Edge Detected"
 cv2.namedWindow(window_name)
@@ -100,7 +101,8 @@ while not exit:
     #edges = cv2.GaussianBlur(src=edges, ksize=(5, 5), sigmaX=0.25) 
     edges_debug = edges.copy()
     colored = cv2.cvtColor(edges_debug, cv2.COLOR_GRAY2BGR)
-
+    colored = remove_mess(colored)
+    
     # Split the image in regions where we try to interpolate the horizon line
     # Frame diveded in two to separate the two walls
     for offset in [0, edges.shape[1] // 2]:
