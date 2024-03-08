@@ -94,9 +94,12 @@ def detect_horizons(frame):
     # Perform Canny edge detection 
     edges = cv2.Canny(blurred,15, 20) 
     #edges = cv2.GaussianBlur(src=edges, ksize=(5, 5), sigmaX=0.9) 
+    rgb_edges = cv2.cvtColor(edges, cv2.COLOR_GRAY2BGR)
+    edges = remove_mess(rgb_edges)
+    edges = cv2.cvtColor(edges, cv2.COLOR_BGR2GRAY)
     edges_debug = edges.copy()
     colored = cv2.cvtColor(edges_debug, cv2.COLOR_GRAY2BGR)
-    colored = remove_mess(colored)
+    
     
     # Split the image in regions where we try to interpolate the horizon line
     # Frame diveded in two to separate the two walls
@@ -140,8 +143,8 @@ def detect_horizons(frame):
             ## Draw the regression line on the image
             #line_thickness = 1
             #cv2.line(colored, (x1, y1), (x2, y2), (0, 0, 128), line_thickness)
-            if x_min == 0:
-                cv2.imshow(f"sample: {y}", sample)
+            # if x_min == 0:
+            #     cv2.imshow(f"sample: {y}", sample)
             #assert (sample != edges[y:y+50, x_min:x_max]).any()
             model.wrong = []
             for x in range(x_min, x_max, 5):
