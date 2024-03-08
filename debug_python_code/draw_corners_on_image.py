@@ -20,7 +20,7 @@ files = os.listdir(input_folder)
 files.sort()
 
 # Specify the index of the photo you want to open
-photo_index = 120
+photo_index = 10
 
 # Construct the full path of the image using the specified index
 image_path = os.path.join(input_folder, files[photo_index])
@@ -33,6 +33,7 @@ for uv in uvs[photo_index]:
     print(uv)
     y, x = 240- int(uv[0]), int(uv[1])  # Assuming uvs contains (x, y) coordinates
     # y, x = int(220), int(400)
+    # x, y = int(uv[0]), int(uv[1]) 
     cv2.circle(image, (y, x), 5, (0, 0, 255), -1)  # Draw a circle with radius 5 and red color
 
 

@@ -59,26 +59,29 @@ def Find_T_camera_drone():
     #drone frame
 
     # y_rot = - np.radians(90)
-    z_rot = - np.radians(90)
+    # x_rot =  - np.radians(90)
 
-    x_rot =  - np.radians(90)
+    y_rot = - np.radians(90)
+    z_rot = - np.radians(180)
+
+    # x_rot =  - np.radians(180)
     
 
     # Convert Euler angles to rotation matrices
-    R_roll = np.array([[1, 0, 0],
-                [0, np.cos(x_rot), -np.sin(x_rot)],
-                [0, np.sin(x_rot), np.cos(x_rot)]])
+    # R_roll = np.array([[1, 0, 0],
+    #             [0, np.cos(x_rot), -np.sin(x_rot)],
+    #             [0, np.sin(x_rot), np.cos(x_rot)]])
 
-    # R_pitch = np.array([[np.cos(y_rot), 0, np.sin(y_rot)],
-    #                     [0, 1, 0],
-    #                     [-np.sin(y_rot), 0, np.cos(y_rot)]])
+    R_pitch = np.array([[np.cos(y_rot), 0, np.sin(y_rot)],
+                        [0, 1, 0],
+                        [-np.sin(y_rot), 0, np.cos(y_rot)]])
     
     R_yaw = np.array([[np.cos(z_rot), -np.sin(z_rot), 0],
                     [np.sin(z_rot), np.cos(z_rot), 0],
                     [0, 0, 1]])
     
     #Find correct order for rotations
-    rotation_matrix = np.dot( R_yaw , R_roll)
+    rotation_matrix = np.dot( R_pitch , R_yaw)
     
 
     #forming homogenous matrix, no translation
@@ -99,6 +102,8 @@ def project_points(projection_matrix, corners_drone):
     points: Nx[x,y,z,1.0] np.array of the points that need to be projected to the camera image from drone frame.
     return: Nx[u,v] rounded coordinates of the points in the camera image as int data type.
     """
+
+    print("corn",corners_drone)
     assert corners_drone.shape[-1] == 4
     uvs = None   # calculate points in image plane
     
@@ -108,6 +113,23 @@ def project_points(projection_matrix, corners_drone):
     #giving uvs shape [4,2]
     uvs = coordinates[:, :2]
     uvs = np.round(uvs).astype(int)
+
+
+    #-------------------------Miquel------------------
+    # assert corners_drone.shape[-1] == 4
+    # uvs = []
+    # # points = points[:,:3]
+    # print(corners_drone)
+    # for row in corners_drone:
+    #     projected_points_homogeneous = projection_matrix @ row.T
+
+    #     # Normalize the homogeneous coordinates
+    #     normalized_points = (projected_points_homogeneous[:2] / projected_points_homogeneous[2]).T
+
+    #     # Round the coordinates to integers
+    #     uvs.append(np.round(normalized_points).astype(int))
+    # uvs = np.array(uvs)
+    # # print(uvs)
     
     return uvs
 
@@ -181,14 +203,16 @@ for i in range(0, x_col.shape[0]):
 
 print(uvs_testing[1])
 
-def draw_3D_to_2D(frame):
-    T_drone_org = np.eye(4)
-    cor_coord_drone = np.dot(T_drone_org, np.array([2, 1, 0]).T).T
-    T_camera_drone = Find_T_camera_drone()
-    cor_coord_camera = np.dot(T_camera_drone, cor_coord_drone.T).T
-    uv = project_points(projection_matrix,cor_coord_camera)[:2]
-    print(uv)
-    y, x = 240- int(uv[0]), int(uv[1])  # Assuming uvs contains (x, y) coordinates
-    # y, x = int(220), int(400)
-    cv2.circle(image, (y, x), 5, (0, 0, 255), -1)  # Draw a circle with radius 5 and red color
-    return uvs
+
+
+# def draw_3D_to_2D(frame):
+#     T_drone_org = np.eye(4)
+#     cor_coord_drone = np.dot(T_drone_org, np.array([2, 1, 0]).T).T
+#     T_camera_drone = Find_T_camera_drone()
+#     cor_coord_camera = np.dot(T_camera_drone, cor_coord_drone.T).T
+#     uv = project_points(projection_matrix,cor_coord_camera)[:2]
+#     print(uv)
+#     y, x = 240- int(uv[0]), int(uv[1])  # Assuming uvs contains (x, y) coordinates
+#     # y, x = int(220), int(400)
+#     cv2.circle(image, (y, x), 5, (0, 0, 255), -1)  # Draw a circle with radius 5 and red color
+#     return uvs
