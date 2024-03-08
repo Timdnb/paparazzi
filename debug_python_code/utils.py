@@ -1,3 +1,6 @@
+import numpy as np
+
+
 def remove_mess(image, window_size=10, thresh=.4):
     pixels_threshold = window_size**2 * thresh
     for y in range(0, image.shape[0] - window_size + 1, window_size):
