@@ -9,12 +9,26 @@ def Find_T_drone_org(roll, pitch, yaw, x, y, z):
     #if the points were transformed from drone to original frame. Thus we can know that the drone
     #would see in its frame
 
+    # roll = -roll
+    # pitch = -pitch
+    # yaw = - yaw
+    # x = - x
+    # y = - y
+    # z = - z
+
     roll = -roll
     pitch = -pitch
-    yaw = - yaw
-    x = - x
-    y = - y
-    z = - z
+    yaw = -yaw
+    # yaw = np.radians(90)
+    # yaw = 0
+    # x =  -y
+    # y =  -x
+    # z =  -z
+
+    x =  0
+    y =  0
+    z =  0
+
  
  
     # Convert Euler angles to rotation matrices
@@ -31,9 +45,10 @@ def Find_T_drone_org(roll, pitch, yaw, x, y, z):
                     [0, 0, 1]])
 
     # Combine individual rotation matrices to obtain the overall rotation matrix
-    rotation_matrix = np.dot(np.dot(R_yaw, R_pitch), R_roll)
+    # rotation_matrix = np.dot(np.dot(R_yaw, R_pitch), R_roll)
+    # rotation_matrix = np.linalg.inv(rotation_matrix)
     
-    # rotation_matrix = np.dot(R_pitch, np.dot(R_yaw, R_roll))
+    rotation_matrix = np.dot(R_pitch, np.dot(R_pitch, R_yaw))
     # print(rotation_matrix)
 
     # Translation vector representing displacement between the origins of the frames
@@ -61,8 +76,8 @@ def Find_T_camera_drone():
     # y_rot = - np.radians(90)
     # x_rot =  - np.radians(90)
 
-    y_rot = - np.radians(90)
-    z_rot = - np.radians(180)
+    y_rot = -np.radians(90)
+    z_rot = -np.radians(90)
 
     # x_rot =  - np.radians(180)
     
@@ -81,7 +96,8 @@ def Find_T_camera_drone():
                     [0, 0, 1]])
     
     #Find correct order for rotations
-    rotation_matrix = np.dot( R_pitch , R_yaw)
+    rotation_matrix = np.dot( R_yaw , R_pitch)
+    # rotation_matrix = np.eye(3)
     
 
     #forming homogenous matrix, no translation
@@ -103,23 +119,34 @@ def project_points(projection_matrix, corners_drone):
     return: Nx[u,v] rounded coordinates of the points in the camera image as int data type.
     """
 
-    print("corn",corners_drone)
-    assert corners_drone.shape[-1] == 4
-    uvs = None   # calculate points in image plane
+    # print("corn",corners_drone)
+    # assert corners_drone.shape[-1] == 4
+    # uvs = None   # calculate points in image plane
     
-    coordinates = np.dot(projection_matrix, corners_drone.T).T
-    coordinates = coordinates[:, :2] / coordinates[:, 2:] #normalisation
+    # coordinates = np.dot(projection_matrix, corners_drone.T).T
+    # coordinates = coordinates[:, :2] / coordinates[:, 2:] #normalisation
 
-    #giving uvs shape [4,2]
-    uvs = coordinates[:, :2]
-    uvs = np.round(uvs).astype(int)
+    # #giving uvs shape [4,2]
+    # uvs = coordinates[:, :2]
+    # uvs = np.round(uvs).astype(int)
+
+    assert corners_drone.shape[-1] == 4
+    
+    # Project points to camera image
+    coordinates = np.dot(projection_matrix, corners_drone.T).T
+    coordinates = coordinates[:, :2] / coordinates[:, 2][:, np.newaxis]  # Normalization
+    
+    # Round and convert coordinates to integer
+    uvs = np.round(coordinates).astype(int)
+
+    return uvs
 
 
     #-------------------------Miquel------------------
     # assert corners_drone.shape[-1] == 4
     # uvs = []
     # # points = points[:,:3]
-    # print(corners_drone)
+    # # print(corners_drone)
     # for row in corners_drone:
     #     projected_points_homogeneous = projection_matrix @ row.T
 
@@ -139,14 +166,14 @@ def project_points(projection_matrix, corners_drone):
 
 
 #corner coordiantes in original frame
-cor_coord_org = np.array([[4,4,0,1],
-                          [-4,-4,0,1],
-                          [4,-4,0,1],
-                          [-4,4,0,1]])
+cor_coord_org = np.array([[4.,4.,0.,1.],
+                          [-4.,-4.,0.,1.],
+                          [4.,-4.,0.,1.],
+                          [-4.,4.,0.,1.]])
 
 #camera projection matrix 
-projection_matrix  = np.array([[30,0,120,0],
-                               [0,30,260,0],
+projection_matrix  = np.array([[600,0,120,0],
+                               [0,600,260,0],
                                [0,0,1,0],
                                [0,0,0,1]])
 
@@ -182,11 +209,26 @@ for i in range(0, x_col.shape[0]):
     T_drone_org = Find_T_drone_org(roll_col[i], pitch_col[i], yaw_col[i], x_col[i], y_col[i], z_col[i])
 
     #Find corners coordinates in drone frame
+    # if i == 0:
+    #     print(cor_coord_org)
+    #     print(x_col[i] )
+
+    cor_coord_org[:,0] = cor_coord_org[:,0] - x_col[i]
+    cor_coord_org[:,1] = cor_coord_org[:,1] - y_col[i]
+    cor_coord_org[:,2] = cor_coord_org[:,2] - z_col[i]
     cor_coord_drone = np.dot(T_drone_org, cor_coord_org.T).T
+
+    if i == 0:
+        print(cor_coord_org[0,:] )
+        print("new cords",cor_coord_drone)
 
     #Find 3D coordinates in camera frame
     T_camera_drone = Find_T_camera_drone()
     cor_coord_camera = np.dot(T_camera_drone, cor_coord_drone.T).T
+
+    if i == 0:
+        print(cor_coord_org[0,:] )
+        print("new camera cords",cor_coord_camera)   
     
 
     #Find corner pixel coordinates for the image 
