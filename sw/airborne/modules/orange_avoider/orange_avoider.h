@@ -19,7 +19,7 @@ extern float oa_color_count_frac;
 // functions
 extern void orange_avoider_init(void);
 extern void orange_avoider_periodic(void);
-extern void debugForward(uint8_t waypoint);
+extern void debugForward(char waypoint);
 extern void debugLeft(void);
 extern void debugRight(void);
 #endif
