@@ -20,7 +20,7 @@ files = os.listdir(input_folder)
 files.sort()
 
 # Specify the index of the photo you want to open
-photo_index = 150
+photo_index = 120
 
 # Construct the full path of the image using the specified index
 image_path = os.path.join(input_folder, files[photo_index])

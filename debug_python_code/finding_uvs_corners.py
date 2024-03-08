@@ -180,3 +180,15 @@ for i in range(0, x_col.shape[0]):
     np.save("./saved_numpy.npy", uvs_testing)
 
 print(uvs_testing[1])
+
+def draw_3D_to_2D(frame):
+    T_drone_org = np.eye(4)
+    cor_coord_drone = np.dot(T_drone_org, np.array([2, 1, 0]).T).T
+    T_camera_drone = Find_T_camera_drone()
+    cor_coord_camera = np.dot(T_camera_drone, cor_coord_drone.T).T
+    uv = project_points(projection_matrix,cor_coord_camera)[:2]
+    print(uv)
+    y, x = 240- int(uv[0]), int(uv[1])  # Assuming uvs contains (x, y) coordinates
+    # y, x = int(220), int(400)
+    cv2.circle(image, (y, x), 5, (0, 0, 255), -1)  # Draw a circle with radius 5 and red color
+    return uvs
