@@ -191,6 +191,16 @@ uint8_t increase_nav_heading(float incrementDegrees)
   return false;
 }
 
+void debugRight() 
+{
+  increase_nav_heading(10.0);
+}
+
+void debugLeft() 
+{
+  increase_nav_heading(-10.0);
+}
+
 /*
  * Calculates coordinates of distance forward and sets waypoint 'waypoint' to those coordinates
  */
@@ -200,6 +210,11 @@ uint8_t moveWaypointForward(uint8_t waypoint, float distanceMeters)
   calculateForwards(&new_coor, distanceMeters);
   moveWaypoint(waypoint, &new_coor);
   return false;
+}
+
+void debugForward(char waypoint)
+{
+  moveWaypointForward((unsigned char) waypoint, 0.2);
 }
 
 /*
@@ -212,7 +227,7 @@ uint8_t calculateForwards(struct EnuCoor_i *new_coor, float distanceMeters)
   // Now determine where to place the waypoint you want to go to
   new_coor->x = stateGetPositionEnu_i()->x + POS_BFP_OF_REAL(sinf(heading) * (distanceMeters));
   new_coor->y = stateGetPositionEnu_i()->y + POS_BFP_OF_REAL(cosf(heading) * (distanceMeters));
-  VERBOSE_PRINT("Calculated %f m forward position. x: %f  y: %f based on pos(%f, %f) and heading(%f)\n", distanceMeters,	
+  VERBOSE_PRINT("Calculated %f m forward position. x: %f  y: %f based on pos(%f, %f) and heading(%f)\n", distanceMeters,  
                 POS_FLOAT_OF_BFP(new_coor->x), POS_FLOAT_OF_BFP(new_coor->y),
                 stateGetPositionEnu_f()->x, stateGetPositionEnu_f()->y, DegOfRad(heading));
   return false;
@@ -244,4 +259,3 @@ uint8_t chooseRandomIncrementAvoidance(void)
   }
   return false;
 }
-
