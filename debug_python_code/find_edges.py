@@ -3,6 +3,7 @@ import matplotlib.pyplot as plt
 import os
 import numpy as np
 from sklearn.linear_model import LinearRegression, RANSACRegressor, Ridge
+import copy
 from utils import *
 
 # Load dataset
@@ -62,17 +63,11 @@ def assign_colors_to_compatible_models(models, threshold = 20):
 
     return color_map
 
-
-exit = False
-i = 100
-j = 100
-window_name = "Original vs Edge Detected"
-cv2.namedWindow(window_name)
-
-while not exit:
-    file = example_files[i]
-    frame  = cv2.imread(file)
-    frame = cv2.rotate(frame, cv2.ROTATE_90_COUNTERCLOCKWISE)
+def detect_horizons(frame):
+    """
+    Return the model for each orizon line up to two, and the x for which they meet
+    If there is only one line x_separation is equal to frame.shape[1]
+    """
     original = frame.copy()
     
     # This was an attempt to make the blue and black patches around the arena look the same (I wanted a gradient between the green and blue grass)
@@ -95,30 +90,33 @@ while not exit:
     # Convert the frame to grayscale for edge detection 
     gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)    
     # Apply Gaussian blur to reduce noise and smoothen edges 
-    blurred = cv2.GaussianBlur(src=gray, ksize=(101, 101), sigmaX=0.5) 
+    blurred = cv2.GaussianBlur(src=gray, ksize=(15, 15), sigmaX=0.9) 
     # Perform Canny edge detection 
     edges = cv2.Canny(blurred,15, 20) 
-    #edges = cv2.GaussianBlur(src=edges, ksize=(5, 5), sigmaX=0.25) 
+    #edges = cv2.GaussianBlur(src=edges, ksize=(5, 5), sigmaX=0.9) 
     edges_debug = edges.copy()
     colored = cv2.cvtColor(edges_debug, cv2.COLOR_GRAY2BGR)
     colored = remove_mess(colored)
     
     # Split the image in regions where we try to interpolate the horizon line
     # Frame diveded in two to separate the two walls
+    horizons = []
     for offset in [0, edges.shape[1] // 2]:
         # Should be based on the corner position
         x_min = offset
         x_max = offset+edges.shape[1] // 2
-        wrong = {}
+        wrong = []
         models = []
-        y_min = 80
-        y_max = edges.shape[0] - 40
+        #y_min = 80
+        #y_max = edges.shape[0] - 40
+        y_min = 110
+        y_max = 200 - 40
         for y in range(y_min, y_max, 10):
-            wrong[y] = []
-            sample = edges[y:y+50, x_min:x_max].copy()
+            #sample = copy.deepcopy(edges[y:y+50, x_min:x_max])
+            sample = edges[y:y+50, x_min:x_max]
 
             model = perform_linear_regression(sample)
-            model.estimator_.intercept_[0] += y
+            model.estimator_.intercept_[0] = model.predict([[- x_min]])[0] + y
             #model.intercept_[0] += y
             models.append(model)
 
@@ -134,29 +132,54 @@ while not exit:
         # We try to find the correct model by looking at how many points are on the line
         # If there are too many points around the line we supose it is the mat and not the horizon
         for model, color, y in zip(models, color_map.values(), range(y_min, y_max, 10)):
-            #x1 = 0
+            #x1 = x_min
             #y1 = int(model.predict([[x1]])[0][0])
             #x2 = x_max - 1
             #y2 = int(model.predict([[x2]])[0][0])
-            # Draw the regression line on the image
-            #line_thickness = 2
-            #cv2.line(colored, (x1, y1), (x2, y2), rgb_colors[color], line_thickness)
-            #cv2.imshow(f"sample: {y}", sample)
-
+            ##print((x1, y1), (x2, y2))
+            ## Draw the regression line on the image
+            #line_thickness = 1
+            #cv2.line(colored, (x1, y1), (x2, y2), (0, 0, 128), line_thickness)
+            if x_min == 0:
+                cv2.imshow(f"sample: {y}", sample)
+            #assert (sample != edges[y:y+50, x_min:x_max]).any()
+            model.wrong = []
             for x in range(x_min, x_max, 5):
                 y_predicted = int(model.predict([[x]]).flatten()[0])
                 ys_actual_low = np.where(edges[y_predicted - 3:y_predicted + 3, x] == 255)[0]
                 ys_actual_high = np.where(edges[y_predicted - 5:y_predicted + 10, x] == 255)[0]
                 if len(ys_actual_low) == 0 or len(ys_actual_high) > 2:
-                    wrong[y].append((x, int(y_predicted)))
+                    model.wrong.append((x, int(y_predicted)))
+        
+            #print(y, len(model.wrong))
+        horizons.append(min(models, key = lambda model: len(model.wrong)))
+    return horizons, edges.shape[1] // 2, colored
+
+
+exit = False
+i = 250
+j = 100
+window_name = "Original vs Edge Detected"
+cv2.namedWindow(window_name)
+
+while not exit:
+    file = example_files[i]
+    frame  = cv2.imread(file)
+    frame = cv2.rotate(frame, cv2.ROTATE_90_COUNTERCLOCKWISE)
+    models, x_separation, colored = detect_horizons(frame)
+    
+    assert len(models) == 2 if x_separation < frame.shape[1] else len(models) == 1
+
+    for k, model in enumerate(models):
+        for x in range([0, x_separation][k], [frame.shape[1] // 2 - x_separation, frame.shape[1] // 2][k], 5):
+            y_predicted = int(model.predict([[x]]).flatten()[0])
+            ys_actual_low = np.where(edges[y_predicted - 3:y_predicted + 3, x] == 255)[0]
+            ys_actual_high = np.where(edges[y_predicted - 5:y_predicted + 10, x] == 255)[0]
+            if len(ys_actual_low) == 0 or len(ys_actual_high) > 2:
+                wrong.append((x, int(y_predicted)))
         
         
-        y = min(wrong, key = lambda k: len(wrong[k]))
-        sorted_items = sorted(wrong.items(), key=lambda x: len(x[1]))
-        for key, value in sorted_items:
-            pass
-            #print(f"Key: {key}, Length: {len(value)}")
-        for x0, y0 in wrong[y]:
+        for x0, y0 in model.wrong:
             cv2.circle(colored, (x0, y0), 2, (0, 0, 255), -1)
 
     # I don't have the model anymore
@@ -165,7 +188,7 @@ while not exit:
     #line_thickness = 2  # Adjust thickness as needed
     #cv2.line(edges, (0, 110+model.intercept_), (edges.shape[1], j), line_color, line_thickness)
 
-    combined_image = cv2.hconcat([original, colored])
+    combined_image = cv2.hconcat([colored, frame])
     cv2.imshow(window_name, combined_image)
     cv2.setWindowTitle(window_name, f"Original vs Edge Detected - Index {i}")
     key = cv2.waitKey(0)
