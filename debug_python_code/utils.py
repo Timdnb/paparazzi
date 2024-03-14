@@ -9,7 +9,7 @@ def remove_mess(image, window_size=10, thresh=.4):
             roi = image[y:y+window_size, x:x+window_size]
             
             # Count white pixels 
-            white_pixels = np.sum(roi == 255)
+            white_pixels = np.sum(roi == 255) * 3
             
             # If there are 20 or more white pixels, replace the entire ROI with black pixels
             if white_pixels >= pixels_threshold:
