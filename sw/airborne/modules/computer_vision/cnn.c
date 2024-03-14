@@ -49,6 +49,7 @@ static struct image_t *cnn_func(struct image_t *img, uint8_t camera_id __attribu
   image_to_grayscale(img, &gray);
 
   // Convert image to tensor
+  // IMPORTANT: order is now [right, forward, left]
   float tensor_output[1][3];
   float tensor_input[1][1][TENSOR_HEIGHT][TENSOR_WIDTH];
   convert_image_to_tensor(&gray, tensor_input);
@@ -67,20 +68,20 @@ static struct image_t *cnn_func(struct image_t *img, uint8_t camera_id __attribu
   // TODO: improve code
   int x_min_right = 10;
   int x_max_right = 10 + (int)(tensor_output[0][0] * 40);
-  int y_min_rigth = 10;
-  int y_max_right = 30;
+  int y_min_rigth = 60;
+  int y_max_right = 80;
   image_draw_rectangle(img, x_min_right, x_max_right, y_min_rigth, y_max_right, white);
 
   int x_min_left = 10;
   int x_max_left = 10 + (int)(tensor_output[0][1] * 40);
-  int y_min_left = 40;
-  int y_max_left = 60;
+  int y_min_left = 35;
+  int y_max_left = 55;
   image_draw_rectangle(img, x_min_left, x_max_left, y_min_left, y_max_left, white);
 
   int x_min_forward = 10;
   int x_max_forward = 10 + (int)(tensor_output[0][2] * 40);
-  int y_min_forward = 70;
-  int y_max_forward = 90;
+  int y_min_forward = 10;
+  int y_max_forward = 30;
   image_draw_rectangle(img, x_min_forward, x_max_forward, y_min_forward, y_max_forward, white);
 
   // // Print outputs
