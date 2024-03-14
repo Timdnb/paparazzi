@@ -27,7 +27,7 @@ def remove_mess(image, window_size=10, thresh=.4):
     return image
 
 def perform_linear_regression_with_guess(binary_image, model, x_range):
-    ACCEPT_REGION = 5
+    ACCEPT_REGION = 4
     """
     Given a portion of the image we try to find the horizon
     """
@@ -38,7 +38,9 @@ def perform_linear_regression_with_guess(binary_image, model, x_range):
         distance = ACCEPT_REGION * 5 + 1
         best_y = -1
         prediction = int(model.predict([[x]])[0][0])
-        for y in range(max(0, prediction - ACCEPT_REGION * 5), min(binary_image.shape[1], prediction + ACCEPT_REGION * 5)):
+        for y in range(max(0, prediction - ACCEPT_REGION * 4), min(binary_image.shape[0] - 1, prediction + ACCEPT_REGION * 4)):
+            if not binary_image[y][x]:
+                continue
             # Maybe try to save from both direction if similar
             new_distance = abs(y - prediction)
             if new_distance < distance:
@@ -49,6 +51,7 @@ def perform_linear_regression_with_guess(binary_image, model, x_range):
             new_x.append(x)
             new_y.append(y)
 
+    print(new_x, new_y)
     if counter < 2:
         print("No white pixels found in the image.")
         return model
@@ -64,7 +67,9 @@ def perform_linear_regression_with_guess(binary_image, model, x_range):
         distance = ACCEPT_REGION + 1
         best_y = -1
         prediction = int(model.predict([[x]])[0][0])
-        for y in range(max(0, prediction - ACCEPT_REGION), min(binary_image.shape[1], prediction + ACCEPT_REGION)):
+        for y in range(max(0, prediction - ACCEPT_REGION), min(binary_image.shape[0] - 1, prediction + ACCEPT_REGION)):
+            if not binary_image[y][x]:
+                continue
             # Maybe try to save from both direction if similar
             new_distance = abs(y - prediction)
             if new_distance < distance:
@@ -101,31 +106,35 @@ def detect_horizons(frame):
     for offset in [0, edges.shape[1] // 2]:
         # Should be based on the corner position
         x_min = offset
-        x_max = offset+edges.shape[1] // 2
+        x_max = offset+edges.shape[1] // 2 - 1
         wrong = []
         models = []
         #y_min = 80
         y_min = 130
         y_max = 210
         if offset == 0:
-            angle = 2/3
+            angle = -2/3
         else:
-            angle = -1/4
+            angle = 1/4
         for y in range(y_min, y_max, 30):
             #sample = copy.deepcopy(edges[y:y+50, x_min:x_max])
             guess = LinearRegression()
             if x_min == 0:
-                guess.fit([[0], [x_max - x_min]], [[y + angle * (x_max - x_min)], [y]])
+                y_x_min = y - angle * (x_max - x_min)
+                y_x_max = y
             else:
-                guess.fit([[x_min], [x_max]], [[y], [y - angle * (x_max - x_min)]])
+                y_x_min = y
+                y_x_max = y + angle * (x_max - x_min)
+            guess.fit([[x_min], [x_max]], [[y_x_min], [y_x_min]])
             model = perform_linear_regression_with_guess(edges, guess, range(x_min, x_max))
+            print(y, x_min, x_max, *model.predict([[x_min], [x_max]]))
             #sample = edges[y:y+50, x_min:x_max]
 
             #model = perform_linear_regression(sample)
             if model is None:
                 continue
             #model.estimator_.intercept_[0] = model.predict([[- x_min]])[0] + y
-            model.intercept_[0] = model.predict([[- x_min]])[0][0]# + y
+            #model.intercept_[0] = model.predict([[- x_min]])[0][0]# + y
             models.append(model)
 
         # We try to find the correct model by looking at how many points are on the line
@@ -145,9 +154,9 @@ def detect_horizons(frame):
         old_model = min(models, key = lambda model: len(model.wrong))
         old_model.color = (0, 0, 100)
         guess = old_model
-        guess.intercept_[0] = old_model.predict([[x_min]])[0][0]
+        #guess.intercept_[0] = old_model.predict([[x_min]])[0][0]
         model = perform_linear_regression_with_guess(edges, guess, range(x_min, x_max))
-        model.intercept_[0] = model.predict([[- x_min]])[0][0]
+        #model.intercept_[0] = model.predict([[- x_min]])[0][0]
         model.wrong = []
         model.color = model.color = (0, 255, 0)
         for x in range(x_min, x_max, 2):
