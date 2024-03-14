@@ -4,30 +4,13 @@
   <doc>
     <description>Color Object Detector
     Detects an object by a continuous color. Optionally draws on image.
-    
     </description>
-    <define name="COLOR_OBJECT_DETECTOR_CAMERA1" value="front_camera|bottom_camera" description="Video device to use"/>
-    <define name="COLOR_OBJECT_DETECTOR_FPS1" value="0" description="Desired FPS (0: camera rate)"/>
-    <define name="COLOR_OBJECT_DETECTOR_LUM_MIN1" value="0" description="Filter 1 min luminance"/>
-    <define name="COLOR_OBJECT_DETECTOR_LUM_MAX1" value="0" description="Filter 1 max luminance"/>
-    <define name="COLOR_OBJECT_DETECTOR_CB_MIN1" value="0" description="Filter 1 min blue chroma"/>
-    <define name="COLOR_OBJECT_DETECTOR_CB_MAX1" value="0" description="Filter 1 max blue chroma"/>
-    <define name="COLOR_OBJECT_DETECTOR_CR_MIN1" value="0" description="Filter 1 min red chroma"/>
-    <define name="COLOR_OBJECT_DETECTOR_CR_MAX1" value="0" description="Filter 1 max red chroma"/>
-    <define name="COLOR_OBJECT_DETECTOR_DRAW1" value="FALSE|TRUE" description="Whether or not to draw on image"/>
 
-    <define name="COLOR_OBJECT_DETECTOR_CAMERA2" value="front_camera|bottom_camera" description="Video device to use"/>
-    <define name="COLOR_OBJECT_DETECTOR_FPS2" value="0" description="Desired FPS (0: camera rate)"/>
-    <define name="COLOR_OBJECT_DETECTOR_LUM_MIN2" value="0" description="Filter 1 min luminance"/>
-    <define name="COLOR_OBJECT_DETECTOR_LUM_MAX2" value="0" description="Filter 2 max luminance"/>
-    <define name="COLOR_OBJECT_DETECTOR_CB_MIN2" value="0" description="Filter 2 min blue chroma"/>
-    <define name="COLOR_OBJECT_DETECTOR_CB_MAX2" value="0" description="Filter 2 max blue chroma"/>
-    <define name="COLOR_OBJECT_DETECTOR_CR_MIN2" value="0" description="Filter 2 min red chroma"/>
-    <define name="COLOR_OBJECT_DETECTOR_CR_MAX2" value="0" description="Filter 2 max red chroma"/>
-    <define name="COLOR_OBJECT_DETECTOR_DRAW2" value="FALSE|TRUE" description="Whether or not to draw on image"/>
+    <define name="CNN_CAMERA" value="front_camera|bottom_camera" description="Video device to use"/>
+    <define name="CNN_FPS" value="0" description="Desired FPS (0: camera rate)"/>
   </doc>
 
-  <settings>
+  <!-- <settings>
     <dl_settings>
       <dl_settings name="ColorObjectDetector">
          <dl_setting var="cod_lum_min1" min="0" step="1" max="255" shortname="y_min1"/>
@@ -46,7 +29,7 @@
          <dl_setting var="cod_draw2"  min="0" step="1" max="1" values="False|True" shortname="draw 2" />
       </dl_settings>
     </dl_settings>
-  </settings>
+  </settings> -->
 
   <dep>
     <depends>video_thread</depends>
@@ -56,8 +39,8 @@
     <file name="cnn.h"/>
   </header>
 
-  <init fun="color_object_detector_init()"/>
-  <periodic fun="color_object_detector_periodic()" freq="50"/>
+  <init fun="cnn_init()"/>
+  <!-- <periodic fun="color_object_detector_periodic()" freq="50"/> -->
   <makefile target="ap|nps">
     <file name="cnn.c"/>
   </makefile>
