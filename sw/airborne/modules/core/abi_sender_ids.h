@@ -572,6 +572,13 @@
 #endif
 
 /*
+ * CNN_CONTROL_INPUTS communication (message 37)
+*/
+#ifndef CNN_CONTROL_INPUTS_ID
+#define CNN_CONTROL_INPUTS_ID 1
+#endif
+
+/*
  * JOYSTICK message (used for payload or control, but not as a RC)
  */
 #ifndef JOYSTICK_ID
