@@ -5,6 +5,25 @@
 
 namespace fs = std::filesystem;
 
+int length(cv::Mat &image, cv::Vec4i line) {
+    int count = 0;
+    int x1 = line[0], y1 = line[1], x2 = line[2], y2 = line[3];
+    float dy = (y2 - y1) / (x2 - x1);
+    // Iterate over the line segment and count white pixels
+    for (int x = x1; x < x2; x++) {
+        int y = y1 + dy * (x - x1);
+        
+        // Ensure coordinates are within image bounds
+        if (x >= 0 && x < image.cols && y >= 0 && y < image.rows) {
+            // Check if the pixel is white (assuming white is 255 in grayscale)
+            if (image.at<uchar>(y, x) == 255) {
+                count++;
+            }
+        }
+    }
+    
+    return count;
+}
 
 void remove_mess(cv::Mat &image, int window_size = 15, double thresh = 0.35) {
     int pixels_threshold = window_size * window_size * thresh;
@@ -78,6 +97,7 @@ int main(int argc, char** argv) {
         cv::Mat edges;
         cv::Canny(gray, edges, 15, 20);
 
+        // First guess
         int y_min = 120;
         // Consider only edges from the region where y > 150
         cv::Mat edges_roi = edges(cv::Rect(0, y_min, edges.cols, edges.rows - y_min));
@@ -88,22 +108,17 @@ int main(int argc, char** argv) {
         // Detect lines using Hough transform
         std::vector<cv::Vec4i> lines;
         cv::HoughLinesP(edges_roi, lines, 1, 5 * CV_PI / 180, 10, 100, 30);
-/*
-        // Remove unwanted elements
-        remove_mess(edges);
 
-        // Detect lines using Hough transform
-        std::vector<cv::Vec4i> lines;
-        cv::HoughLinesP(edges, lines, 1, 5 * CV_PI / 180, 10, 100, 30);
-
-*/
         // Convert edges to colored image (for displaying)
         cv::cvtColor(edges, edges, cv::COLOR_GRAY2BGR);
 
         // Draw detected lines on the colored image
         for (size_t i = 0; i < lines.size(); i++) {
             cv::Vec4i line = lines[i];
-            cv::line(edges, cv::Point(line[0], line[1] + y_min), cv::Point(line[2], line[3] + y_min), cv::Scalar(0, 0, 255), 2);
+            float angle = atan2(line[3] - line[1], line[2] - line[0]) * 180 / CV_PI;
+            if (std::abs(angle) < 45) {
+                cv::line(edges, cv::Point(line[0], line[1] + y_min), cv::Point(line[2], line[3] + y_min), cv::Scalar(0, 0, 255), 2);
+            }
         }
 
         // Display the resulting image
