@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2019 Kirk Scheper <kirkscheper@gmail.com>
+ * Copyright (C) 2015
  *
  * This file is part of Paparazzi.
  *
@@ -20,37 +20,24 @@
  */
 
 /**
- * @file modules/computer_vision/cv_detect_color_object.h
- * Assumes the color_object consists of a continuous color and checks
- * if you are over the defined color_object or not
+ * @file modules/computer_vision/cnn.h
  */
 
 #ifndef CNN_H
 #define CNN_H
 
 #include <stdint.h>
-#include <stdbool.h>
+#include "modules/computer_vision/cv.h"
 
-// Module settings
-extern uint8_t cod_lum_min1;
-extern uint8_t cod_lum_max1;
-extern uint8_t cod_cb_min1;
-extern uint8_t cod_cb_max1;
-extern uint8_t cod_cr_min1;
-extern uint8_t cod_cr_max1;
-
-extern uint8_t cod_lum_min2;
-extern uint8_t cod_lum_max2;
-extern uint8_t cod_cb_min2;
-extern uint8_t cod_cb_max2;
-extern uint8_t cod_cr_min2;
-extern uint8_t cod_cr_max2;
-
-extern bool cod_draw1;
-extern bool cod_draw2;
+// Tensor dimensions
+#define TENSOR_HEIGHT 130
+#define TENSOR_WIDTH 60
 
 // Module functions
-extern void color_object_detector_init(void);
-extern void color_object_detector_periodic(void);
+extern void cnn_init(void);
 
-#endif /* COLOR_OBJECT_DETECTOR_CV_H */
+void entry(const float tensor_input_1[1][1][130][60], float tensor_19[1][3]);
+
+void convert_image_to_tensor(struct image_t *image, float tensor_input[1][1][TENSOR_HEIGHT][TENSOR_WIDTH]);
+
+#endif /* CNN_H */
