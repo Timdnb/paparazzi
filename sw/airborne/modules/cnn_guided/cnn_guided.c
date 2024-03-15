@@ -100,7 +100,7 @@ void cnn_guided_periodic(void)
   // compute current forward threshold
   int32_t forward_threshold = 0.5;
 
-  VERBOSE_PRINT("Left: %d  Forward: %d Right: %d \n", left, forward, right);
+  VERBOSE_PRINT("Left: %f  Forward: %f Right: %f \n", left, forward, right);
   // VERBOSE_PRINT("Obstacle free confidence: %d \n", obstacle_free_confidence);
   printf("ID: %u \n", send);
   

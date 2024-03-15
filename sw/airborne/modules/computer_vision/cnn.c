@@ -86,10 +86,12 @@ static struct image_t *cnn_func(struct image_t *img, uint8_t camera_id __attribu
 
   // // Print outputs
   printf("tensor_output: %f, %f, %f\n", tensor_output[0][0], tensor_output[0][1], tensor_output[0][2]);
-  printf("cnn_input_id: %f\n",CNN_CONTROL_INPUTS_ID);
+  
 
   // Send outputs
   AbiSendMsgCNN_CONTROL_INPUTS(CNN_CONTROL_INPUTS_ID, tensor_output[0][0], tensor_output[0][1], tensor_output[0][2]);
+
+  printf("cnn_input_id: %d\n",CNN_CONTROL_INPUTS_ID);
 
   return img;
 }
