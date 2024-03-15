@@ -105,19 +105,21 @@ void convert_image_to_tensor(struct image_t *image, float tensor_input_1[1][1][T
     // Extract pixel values from the image buffer
     uint8_t *pixel_values = (uint8_t *)(image->buf);
 
-    // Start from the first pixel of the cropped region (want to crop top and bottom 25%)
-    pixel_values += (image->w * (image->h / 4));
+    // TODO: IMPROVE BELOW -> THIS IS TERRIBLE, BUT IT WORKS FOR NOW
+    // first store the image in a tensor
+    float intermediate[1][1][520][240];
+    for (int i = 0; i < 520; i++) {
+        for (int j = 0; j < 240; j++) {
+            intermediate[0][0][i][j] = (float)pixel_values[(i * image->w) + j] / 255.0f;
+          }
+        }
 
-    // Iterate through the cropped region and scale down to fit tensor dimensions
+    // then extract the region of interest
     for (int i = 0; i < TENSOR_HEIGHT; i++) {
         for (int j = 0; j < TENSOR_WIDTH; j++) {
-            // Calculate the corresponding pixel position in the original image
-            int original_row = (i * 2) + (image->h / 4);
-            int original_col = (j * 4);
-            // Map to the pixel value in the original image
-            uint8_t pixel_value = pixel_values[(original_row * image->w) + original_col];
-            // Scale down the pixel value to fit the range [0, 1] for the tensor
-            tensor_input_1[0][0][i][j] = (float)pixel_value / 255.0f;
+            int row_idx = i * 4;
+            int col_idx = j * 2 + 60;
+            tensor_input_1[0][0][i][j] = intermediate[0][0][row_idx][col_idx];
         }
     }
 
