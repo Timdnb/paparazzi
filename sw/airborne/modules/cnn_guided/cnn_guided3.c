@@ -10,8 +10,8 @@
  * TO COME
  */
 /**
- * FLR_mode
- * It uses the confidence values for forward left and right to decide where to go
+ * Follow path and RFL mode
+ * waypoints need to be implemented for follow_path
  */
 #include "modules/cnn_guided/cnn_guided.h"
 #include "firmwares/rotorcraft/guidance/guidance_h.h"
@@ -33,9 +33,8 @@
 uint8_t chooseRandomIncrementAvoidance(void);
 
 enum navigation_state_t {
-  FORWARD,
-  LEFT,
-  RIGHT,
+  FOLLOW_PATH,
+  RFL_MODE,
   OUT_OF_BOUNDS,
   REENTER_ARENA, 
   STATIONARY
@@ -62,6 +61,7 @@ float left_conf = 0;
 int times_left;
 int times_right;
 int times_forward;
+int turns_made;
 
 // callback function to save control inputs
 // #ifndef CNN_CONTROL_INPUTS_ID
@@ -107,7 +107,7 @@ void cnn_guided_periodic(void)
 
 
   // compute current forward threshold
-  int32_t forward_threshold = 0.5;
+  int32_t forward_threshold = 0.35;
 
   VERBOSE_PRINT("Left: %f  Forward: %f Right: %f \n", left_conf, forward_conf, right_conf);
   // VERBOSE_PRINT("Obstacle free confidence: %d \n", obstacle_free_confidence);
@@ -115,47 +115,46 @@ void cnn_guided_periodic(void)
   
 
     // update our safe confidence using color threshold
-  // if(forward_conf > forward_threshold){
-  //   obstacle_free_confidence++;
-  // } else {
-  //   obstacle_free_confidence -= 2;  // be more cautious with positive obstacle detections
-  // }
-
-
-  if (forward_conf > right_conf && forward_conf > left_conf){
-    navigation_state = FORWARD;
-  } else if (right_conf > forward_conf && right_conf > left_conf && navigation_state != LEFT && times_forward > 2){
-    navigation_state = RIGHT;
-    times_forward = 0;
-    times_left= 0;
-  } else if (left_conf > forward_conf && left_conf > right_conf && navigation_state != RIGHT && times_forward > 2){
-    navigation_state = LEFT;
-    times_forward = 0;
-    times_right=0;
+  if(forward_conf > right_conf && forward_conf > left_conf){
+    obstacle_free_confidence++;
   } else {
-    navigation_state = FORWARD;
+    obstacle_free_confidence -= 1;  // be more cautious with positive obstacle detections
   }
+
+  if(obstacle_free_confidence==0){
+    navigation_state =RFL_MODE;
+  } else {
+    navigation_state = FOLLOW_PATH;
+  }
+  
 
 
   switch (navigation_state){
-    case FORWARD:
-      //FORWARD ONLY
+    case FOLLOW_PATH:
+      //FOLLOWING PATH 
       speed = forward_conf * oag_max_speed;
       guidance_h_set_body_vel(speed, 0);
       times_forward++;
       break;
-    case LEFT:
-      // LEFT SLIGHT FORWARD
-      speed = 0.1* forward_conf * oag_max_speed;
-      guidance_h_set_body_vel(speed, 0);
-      guidance_h_set_heading_rate(-RadOfDeg(15));
-      times_left++;
-      break;
-    case RIGHT:
+    case RFL_MODE:
+      if (right_conf > forward_conf && right_conf > left_conf && times_forward > 2){
       speed = 0.1 * forward_conf * oag_max_speed;
       guidance_h_set_body_vel(speed, 0);
       guidance_h_set_heading_rate(RadOfDeg(15));
-      times_right++;
+      times_forward=0;
+    } else if (left_conf > forward_conf && left_conf > right_conf && times_forward > 2){
+        speed = 0.1 * forward_conf * oag_max_speed;
+        guidance_h_set_body_vel(speed, 0);
+        guidance_h_set_heading_rate(-RadOfDeg(15));
+        times_forward=0;
+    } else {
+      navigation_state =  FOLLOW_PATH;
+    }
+    // case RIGHT:
+    //   speed = 0.1 * forward_conf * oag_max_speed;
+    //   guidance_h_set_body_vel(speed, 0);
+    //   guidance_h_set_heading_rate(RadOfDeg(15));
+    //   times_right++;
       break;
     case OUT_OF_BOUNDS:
       // stop
@@ -177,7 +176,7 @@ void cnn_guided_periodic(void)
         obstacle_free_confidence = 0;
 
         // ensure direction is safe before continuing
-        navigation_state = FORWARD;
+        navigation_state = FOLLOW_PATH;
       // }
       break;
     default:
