@@ -17,6 +17,11 @@
 extern float oag_max_speed;         // max flight speed [m/s]
 extern float oag_heading_rate;      // heading rate setpoint [rad/s]
 
+// External declarations to access the confidence values
+extern float forward_conf;
+extern float right_conf;
+extern float left_conf; 
+
 extern void cnn_guided_init(void);
 extern void cnn_guided_periodic(void);
 
