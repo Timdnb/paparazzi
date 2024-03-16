@@ -13,6 +13,17 @@
 #ifndef CNN_GUIDED_H
 #define CNN_GUIDED_H
 
+
+// Add the enum declaration here
+enum navigation_state_t {
+  FORWARD,
+  LEFT,
+  RIGHT,
+  OUT_OF_BOUNDS,
+  REENTER_ARENA,
+  STATIONARY
+};
+
 // settings
 extern float oag_max_speed;         // max flight speed [m/s]
 extern float oag_heading_rate;      // heading rate setpoint [rad/s]
@@ -24,6 +35,8 @@ extern float left_conf;
 
 extern void cnn_guided_init(void);
 extern void cnn_guided_periodic(void);
+
+void update_navigation_state(float forward_conf, float right_conf, float left_conf, enum navigation_state_t* navigation_state, int* times_forward, int* times_left, int* times_right);
 
 #endif /* CNN_GUIDED_H */
 

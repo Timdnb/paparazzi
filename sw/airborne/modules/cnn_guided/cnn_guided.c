@@ -32,14 +32,14 @@
 
 uint8_t chooseRandomIncrementAvoidance(void);
 
-enum navigation_state_t {
-  FORWARD,
-  LEFT,
-  RIGHT,
-  OUT_OF_BOUNDS,
-  REENTER_ARENA, 
-  STATIONARY
-};
+// enum navigation_state_t {
+//   FORWARD,
+//   LEFT,
+//   RIGHT,
+//   OUT_OF_BOUNDS,
+//   REENTER_ARENA, 
+//   STATIONARY
+// };
 
 // define settings
 float oag_max_speed = 0.5f;               // max flight speed [m/s]
@@ -75,6 +75,31 @@ static void save_control_inputs(uint8_t sender_id, float right, float forward, f
   forward_conf = forward;
   left_conf = left;
 }
+
+// Control navigation state
+void update_navigation_state(float forward_conf, float right_conf, float left_conf, enum navigation_state_t* navigation_state, int* times_forward, int* times_left, int* times_right) {
+  VERBOSE_PRINT("Before Update: State=%d, Forward=%d, Left=%d, Right=%d\n", *navigation_state, *times_forward, *times_left, *times_right);
+
+
+  if (forward_conf > right_conf && forward_conf > left_conf) {
+    *navigation_state = FORWARD;
+  } else if (right_conf > forward_conf && right_conf > left_conf && *navigation_state != LEFT && *times_forward > 2) {
+    *navigation_state = RIGHT;
+    *times_forward = 0;
+    *times_left = 0;
+  } else if (left_conf > forward_conf && left_conf > right_conf && *navigation_state != RIGHT && *times_forward > 2) {
+    *navigation_state = LEFT;
+    *times_forward = 0;
+    *times_right = 0;
+  } else {
+    *navigation_state = STATIONARY;
+    
+  }
+// Existing logic here...
+
+  VERBOSE_PRINT("After Update: State=%d, Forward=%d, Left=%d, Right=%d\n", *navigation_state, *times_forward, *times_left, *times_right);
+}
+
 
 /*
  * Initialisation function
@@ -122,40 +147,54 @@ void cnn_guided_periodic(void)
   // }
 
 
-  if (forward_conf > right_conf && forward_conf > left_conf){
-    navigation_state = FORWARD;
-  } else if (right_conf > forward_conf && right_conf > left_conf && navigation_state != LEFT && times_forward > 2){
-    navigation_state = RIGHT;
-    times_forward = 0;
-    times_left= 0;
-  } else if (left_conf > forward_conf && left_conf > right_conf && navigation_state != RIGHT && times_forward > 2){
-    navigation_state = LEFT;
-    times_forward = 0;
-    times_right=0;
-  } else {
-    navigation_state = FORWARD;
-  }
-
+  // if (forward_conf > right_conf && forward_conf > left_conf){
+  //   navigation_state = FORWARD;
+  // } else if (right_conf > forward_conf && right_conf > left_conf && navigation_state != LEFT && times_forward > 2){
+  //   navigation_state = RIGHT;
+  //   times_forward = 0;
+  //   times_left= 0;
+  // } else if (left_conf > forward_conf && left_conf > right_conf && navigation_state != RIGHT && times_forward > 2){
+  //   navigation_state = LEFT;
+  //   times_forward = 0;
+  //   times_right=0;
+  // } else {
+  //   guidance_h_set_body_vel(0, 0);
+  //   guidance_h_set_heading_rate(RadOfDeg(15));
+  // }
+  VERBOSE_PRINT("State: %f \n", navigation_state);
+ 
 
   switch (navigation_state){
+    case STATIONARY:
+      guidance_h_set_body_vel(0, 0);
+      guidance_h_set_heading_rate(RadOfDeg(15));
+      update_navigation_state(forward_conf, right_conf, left_conf, &navigation_state, &times_forward, &times_left, &times_right);
+
+
     case FORWARD:
       //FORWARD ONLY
       speed = forward_conf * oag_max_speed;
       guidance_h_set_body_vel(speed, 0);
       times_forward++;
+      update_navigation_state(forward_conf, right_conf, left_conf, &navigation_state, &times_forward, &times_left, &times_right);
+
       break;
     case LEFT:
       // LEFT SLIGHT FORWARD
-      speed = 0.1* forward_conf * oag_max_speed;
+      speed = 0.05* forward_conf * oag_max_speed;
       guidance_h_set_body_vel(speed, 0);
       guidance_h_set_heading_rate(-RadOfDeg(15));
       times_left++;
+      update_navigation_state(forward_conf, right_conf, left_conf, &navigation_state, &times_forward, &times_left, &times_right);
+
       break;
     case RIGHT:
-      speed = 0.1 * forward_conf * oag_max_speed;
+      speed = 0.05 * forward_conf * oag_max_speed;
       guidance_h_set_body_vel(speed, 0);
       guidance_h_set_heading_rate(RadOfDeg(15));
       times_right++;
+      update_navigation_state(forward_conf, right_conf, left_conf, &navigation_state, &times_forward, &times_left, &times_right);
+
       break;
     case OUT_OF_BOUNDS:
       // stop
