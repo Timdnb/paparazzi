@@ -52,6 +52,7 @@ static pthread_mutex_t mutex;
 #define COLOR_OBJECT_DETECTOR_FPS2 0 ///< Default FPS (zero means run at camera fps)
 #endif
 
+
 // define global variables
 struct color_object_t {
   int32_t x_c;
@@ -60,12 +61,34 @@ struct color_object_t {
   bool updated;
 };
 struct color_object_t global_filters[2];
+
+
+
+
+void extract_luminance_array(struct image_t *yuv, uint8_t *luminance_array);
+
 struct image_t gray;
+// struct image_t gray_toYUV;
 
 static struct image_t *object_detector(struct image_t *img, uint8_t filter)
 {
     // Convert to grayscale
+    image_create(&gray, img->w, img->h, IMAGE_YUV422);
     image_to_grayscale(img, &gray);
+
+    // Declare luminance array as a pointer to pointer to uint8_t
+    // uint8_t *luminance_array;
+
+    // Extract luminance array
+    // extract_luminance_array(&gray, &luminance_array);
+
+    // Access the luminance values as luminance_array[i][j]
+
+    // // Free the memory allocated for luminance_array
+    // for (int i = 0; i < gray.h; i++) {
+    //     free(luminance_array[i]);
+    // }
+    // free(luminance_array);
 
     pthread_mutex_lock(&mutex);
     global_filters[filter-1].color_count = 100;
@@ -73,14 +96,29 @@ static struct image_t *object_detector(struct image_t *img, uint8_t filter)
     global_filters[filter-1].y_c = 10;
     global_filters[filter-1].updated = true;
     pthread_mutex_unlock(&mutex);
-
-  return img;
+    return &gray;
 }
 
 
 
+// void extract_luminance_array(struct image_t *yuv, uint8_t *luminance_array) {
+//     uint8_t *yuv_buf = yuv->buf;
+//     uint16_t width = yuv->w;
+//     uint16_t height = yuv->h;
 
+//     // Allocate memory for the luminance array
+//     luminance_array = (uint8_t **)malloc(height * sizeof(uint8_t *));
+//     for (int i = 0; i < height; i++) {
+//         (luminance_array)[i] = (uint8_t *)malloc(width * sizeof(uint8_t));
+//     }
 
+//     // Copy luminance values from YUV image to the array
+//     for (uint16_t i = 0; i < height; i++) {
+//         for (uint16_t j = 0; j < width * 2; j += 2) {
+//             (luminance_array)[i][j / 2] = yuv_buf[i * width * 2 + j];
+//         }
+//     }
+// }
 
 
 
