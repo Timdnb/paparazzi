@@ -66,12 +66,6 @@ static struct image_t *cnn_func(struct image_t *img, uint8_t camera_id __attribu
   
   // draw rectangles on the original image corresponding to the outputs
   // TODO: improve code
-  int x_min_right = 10;
-  int x_max_right = 10 + (int)(tensor_output[0][0] * 40);
-  int y_min_rigth = 60;
-  int y_max_right = 80;
-  image_draw_rectangle(img, x_min_right, x_max_right, y_min_rigth, y_max_right, white);
-
   int x_min_left = 10;
   int x_max_left = 10 + (int)(tensor_output[0][2] * 40);
   int y_min_left = 10;
@@ -84,14 +78,17 @@ static struct image_t *cnn_func(struct image_t *img, uint8_t camera_id __attribu
   int y_max_forward = 55;
   image_draw_rectangle(img, x_min_forward, x_max_forward, y_min_forward, y_max_forward, white);
 
+    int x_min_right = 10;
+  int x_max_right = 10 + (int)(tensor_output[0][0] * 40);
+  int y_min_rigth = 60;
+  int y_max_right = 80;
+  image_draw_rectangle(img, x_min_right, x_max_right, y_min_rigth, y_max_right, white);
+
   // // Print outputs
-//t: %f, %f, %f\n", tensor_output[0][0], tensor_output[0][1], tensor_output[0][2]);
-  
+  // printf("Right: %f, Forward: %f, Left: %f\n", tensor_output[0][0], tensor_output[0][1], tensor_output[0][2]);
 
   // Send outputs
   AbiSendMsgCNN_CONTROL_INPUTS(CNN_CONTROL_INPUTS_ID, tensor_output[0][0], tensor_output[0][1], tensor_output[0][2]);
-
-  // printf("cnn_input_id: %d\n",CNN_CONTROL_INPUTS_ID);
 
   return img;
 }
@@ -105,19 +102,21 @@ void convert_image_to_tensor(struct image_t *image, float tensor_input_1[1][1][T
     // Extract pixel values from the image buffer
     uint8_t *pixel_values = (uint8_t *)(image->buf);
 
-    // Start from the first pixel of the cropped region (want to crop top and bottom 25%)
-    pixel_values += (image->w * (image->h / 4));
+    // TODO: IMPROVE BELOW -> THIS IS TERRIBLE, BUT IT WORKS FOR NOW
+    // first store the image in a tensor
+    float intermediate[1][1][520][240];
+    for (int i = 0; i < 520; i++) {
+        for (int j = 0; j < 240; j++) {
+            intermediate[0][0][i][j] = (float)pixel_values[(i * image->w) + j] / 255.0f;
+          }
+        }
 
-    // Iterate through the cropped region and scale down to fit tensor dimensions
+    // then extract the region of interest
     for (int i = 0; i < TENSOR_HEIGHT; i++) {
         for (int j = 0; j < TENSOR_WIDTH; j++) {
-            // Calculate the corresponding pixel position in the original image
-            int original_row = (i * 2) + (image->h / 4);
-            int original_col = (j * 4);
-            // Map to the pixel value in the original image
-            uint8_t pixel_value = pixel_values[(original_row * image->w) + original_col];
-            // Scale down the pixel value to fit the range [0, 1] for the tensor
-            tensor_input_1[0][0][i][j] = (float)pixel_value / 255.0f;
+            int row_idx = i * 4;
+            int col_idx = j * 2 + 60;
+            tensor_input_1[0][0][i][j] = intermediate[0][0][row_idx][col_idx];
         }
     }
 
@@ -132,6 +131,7 @@ void convert_image_to_tensor(struct image_t *image, float tensor_input_1[1][1][T
     // {
     //     for (int j = 0; j < TENSOR_WIDTH; j++)
     //     {
+    //         printf("i: %d, j: %d, value: %f\n", i, j, tensor_input_1[0][0][i][j]);
     //         fprintf(f, "%f ", tensor_input_1[0][0][i][j]);
     //     }
     //     fprintf(f, "\n");
