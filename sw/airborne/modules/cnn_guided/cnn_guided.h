@@ -16,6 +16,7 @@
 
 // Add the enum declaration here
 enum navigation_state_t {
+  PATH_FOLLOWING,
   FORWARD,
   LEFT,
   RIGHT,
