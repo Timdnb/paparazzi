@@ -37,7 +37,7 @@ extern float left_conf;
 extern void cnn_guided_init(void);
 extern void cnn_guided_periodic(void);
 
-void update_navigation_state(float forward_conf, float right_conf, float left_conf, enum navigation_state_t* navigation_state, int* times_forward, int* times_left, int* times_right);
+void update_navigation_state(float forward_conf, float right_conf, float left_conf);
 
 #endif /* CNN_GUIDED_H */
 
