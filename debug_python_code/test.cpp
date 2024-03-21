@@ -19,11 +19,12 @@ ncv_videoio -lopencv_viz -lopencv_wechat_qrcode -lopencv_ximgproc -lopencv_video
 encv_features2d -lopencv_dnn -lopencv_flann -lopencv_xphoto -lopencv_photo -lope
 ncv_imgproc -lopencv_core
 
-g++ test.cpp -o test -I/MAV/paparazzi/sw/ext/opencv_bebop/install_pc/include -lopencv_stitching -lopencv_alphamat
- -lopencv_aruco -lopencv_barcode -lopencv_bgsegm -lopencv_bioinspired -lopencv_c
+g++ -std=c++17 test.cpp -o test -I/usr/local/include/opencv4 -L/usr/local/lib -lopencv_stitching -lopencv_alphamat
+ -lopencvruco -lopencv_barcode -lopencv_bgsegm -lopencv_bioinspired -lopencv_c
 calib -lopencv_dnn_objdetect -lopencv_dnn_superres -lopencv_dpm -lopencv_face -l
 opencv_freetype -lopencv_fuzzy -lopencv_hdf -lopencv_hfs -lopencv_img_hash -lope
-ncv_intensity_transform -lopencv_line_descriptor -lopencv_mcc -lopencv_quality -
+ncv_intensity_transf
+orm -lopencv_line_descriptor -lopencv_mcc -lopencv_quality -
 lopencv_rapid -lopencv_reg -lopencv_rgbd -lopencv_saliency -lopencv_shape -lopen
 cv_stereo -lopencv_structured_light -lopencv_phase_unwrapping -lopencv_superres 
 -lopencv_optflow -lopencv_surface_matching -lopencv_tracking -lopencv_highgui -l
@@ -32,6 +33,15 @@ ncv_videoio -lopencv_viz -lopencv_wechat_qrcode -lopencv_ximgproc -lopencv_video
  -lopencv_xobjdetect -lopencv_objdetect -lopencv_calib3d -lopencv_imgcodecs -lop
 encv_features2d -lopencv_dnn -lopencv_flann -lopencv_xphoto -lopencv_photo -lope
 ncv_imgproc -lopencv_core
+
+g++ -std=c++17 test.cpp -o test -I/usr/local/include/opencv4 -L/usr/local/lib \
+-lopencv_stitching -lopencv_core -lopencv_highgui -lopencv_imgproc \
+-lopencv_imgcodecs -lopencv_videoio -lopencv_calib3d -lopencv_features2d \
+-lopencv_objdetect -lopencv_dnn
+
+
+
+-I/usr/local/include/opencv4 
 
 RUN:
 ./test ./cyberzoo_poles_panels_mats/20190121-142935/
