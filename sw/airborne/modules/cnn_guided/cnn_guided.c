@@ -41,12 +41,13 @@ void reset_forward_counter(void);
 static uint8_t moveWaypointForward(uint8_t waypoint, float distanceMeters);
 static uint8_t calculateForwards(struct EnuCoor_i *new_coor, float distanceMeters);
 static uint8_t moveWaypoint(uint8_t waypoint, struct EnuCoor_i *new_coor);
-static uint8_t increase_nav_heading(float incrementDegrees);
+static uint8_t increase_nav_heading();
 static uint8_t chooseRandomIncrementAvoidance(void);
+// void nav_set_heading_towards(float x, float y);
 
 // define settings
 float oa_color_count_frac = 0.18f;
-int head = 2;
+int head = 45;
 // define and initialise global variables
 enum navigation_state_t navigation_state = PATH_FOLLOWING;
 int16_t obstacle_free_confidence = 0;   // a measure of how certain we are that the way ahead is safe.
@@ -68,12 +69,15 @@ float turning_confidence = 0.2;
 int times_left;
 int times_right;
 int times_forward;
+int times_oob = 0; //outofbounds
 // create counters
 int count_left;
 int count_right;
 int count_forward;
 
-float heading_dr;
+float new_heading;
+
+float current_heading;
 float x_dr;
 float y_dr;
 
@@ -138,11 +142,11 @@ bool shouldProceedForward(const float forward_conf, const float right_conf, cons
 }
 
 bool shouldTurnRight(const float forward_conf, const float right_conf, const float left_conf) {
-    return right_conf > forward_conf && right_conf > left_conf && navigation_state != LEFT && right_conf > turning_threshold && times_forward > 2;
+    return right_conf > forward_conf && right_conf > left_conf && navigation_state != LEFT && right_conf > turning_threshold && times_forward > 3;
 }
 
 bool shouldTurnLeft(const float forward_conf, const float right_conf, const float left_conf) {
-    return left_conf > forward_conf && left_conf > right_conf && navigation_state != RIGHT && left_conf > turning_threshold && times_forward > 2;
+    return left_conf > forward_conf && left_conf > right_conf && navigation_state != RIGHT && left_conf > turning_threshold && times_forward > 3;
 }
 
 // Utility functions to reset counters
@@ -181,6 +185,15 @@ void cnn_guided_periodic(void)
     return;
   }
 
+  current_heading = stateGetNedToBodyEulers_f()->psi;
+  
+  x_dr = stateGetPositionEnu_f()->x;
+  y_dr = stateGetPositionEnu_f()->y;
+  // normalize heading to [-pi, pi]
+  FLOAT_ANGLE_NORMALIZE(current_heading);
+
+  // VERBOSE_PRINT("heading to %f, rad:%f\n", DegOfRad(current_heading), current_heading);
+  // VERBOSE_PRINT("<><>----Heing=%f, pos_x=%f, pos_y=%f\n",DegOfRad(current_heading), x_dr, y_dr);
   
   // update our safe confidence
   if (forward_conf > right_conf && forward_conf > left_conf){
@@ -210,8 +223,7 @@ void cnn_guided_periodic(void)
       break;
 
     case STATIONARY:
-      guidance_h_set_body_vel(0, 0);
-      increase_nav_heading(head);      
+      guidance_h_set_body_vel(0, 0);    
       
       update_navigation_state(forward_conf, right_conf, left_conf);
 
@@ -245,23 +257,27 @@ void cnn_guided_periodic(void)
       break;
     
     case OUT_OF_BOUNDS:
+      if (times_oob==0){ 
+      nav_set_heading_towards(0.0,0.0);
+      }
 
-      increase_nav_heading(head);
-      guidance_h_set_body_vel(0, 0);
-      
+      speed = turning_confidence * oag_max_speed;
+      guidance_h_set_body_vel(speed, 0);
       // VERBOSE_PRINT("End------Heading=%d, pos_x=%d, pos_y=%d\n",heading_dr, x_dr, y_dr);
 
       
-
+      //0 heading straight up, left -90 ,right 90
       if (InsideObstacleZone(stateGetPositionEnu_f()->x, stateGetPositionEnu_f()->y)){
         // add offset to head back into arena
-        increase_nav_heading(head);
+        // increase_nav_heading(head);
         // reset safe counter
         obstacle_free_confidence = 0;
-
+        times_oob = 0;
+        nav.heading = 0;
         // ensure direction is safe before continuing
         navigation_state = PATH_FOLLOWING;
       }
+      times_oob++;
       break;
     default:
       break;
@@ -269,22 +285,37 @@ void cnn_guided_periodic(void)
   return;
 }
 
+
 /*
  * Increases the NAV heading. Assumes heading is an INT32_ANGLE. It is bound in this function.
 //  */
-uint8_t increase_nav_heading(float incrementDegrees)
+uint8_t increase_nav_heading()
 {
-  float new_heading = stateGetNedToBodyEulers_f()->psi+RadOfDeg(incrementDegrees);
+  current_heading = DegOfRad(stateGetNedToBodyEulers_f()->psi);
   x_dr = stateGetPositionEnu_f()->x;
   y_dr = stateGetPositionEnu_f()->y;
   // normalize heading to [-pi, pi]
-  FLOAT_ANGLE_NORMALIZE(new_heading);
+  FLOAT_ANGLE_NORMALIZE(current_heading);
 
+  //Based on where the drone is in the obstacle field choose new heading
+  if (x_dr>1 && y_dr>-1){
+    new_heading = RadOfDeg(current_heading-45); 
+  } else if (x_dr>-1 && y_dr<-1){
+    new_heading = RadOfDeg(current_heading-135);
+  } else if (x_dr<1 && y_dr>1){
+    new_heading = RadOfDeg(current_heading+45);//-- +
+  } else if (x_dr<1 && y_dr>1){
+    new_heading = RadOfDeg(current_heading+135);//-- +
+  } else{
+    new_heading = RadOfDeg(current_heading-180);
+  }
+  FLOAT_ANGLE_NORMALIZE(new_heading)
+  // float new_heading = stateGetNedToBodyEulers_f()->psi+RadOfDeg(incrementDegrees);
   // set heading, declared in firmwares/rotorcraft/navigation.h
   nav.heading = new_heading;
-  guidance_h_set_heading_rate(new_heading);
-  VERBOSE_PRINT("Increasing heading to %f, rad:%f\n", DegOfRad(new_heading), new_heading);
-  VERBOSE_PRINT("<><>----Heing=%f, pos_x=%f, pos_y=%f\n",DegOfRad(new_heading), x_dr, y_dr);
+  guidance_h_set_heading_rate(new_heading*oag_heading_rate);
+  
+  VERBOSE_PRINT("NEWHEADING=%f, pos_x=%f, pos_y=%f\n",DegOfRad(new_heading), x_dr, y_dr);
   return false;
 }
 
