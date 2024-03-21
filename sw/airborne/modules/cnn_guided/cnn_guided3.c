@@ -1,25 +1,25 @@
 /*
- * Copyright (C) Kirk Scheper <kirkscheper@gmail.com>
+ * Copyright (C) Roland Meertens
  *
  * This file is part of paparazzi
  *
  */
 /**
- * @file "modules/cnn_guided/cnn_guided.c"
- * @author Tim den Blanken
- * TO COME
+ * @file "modules/orange_avoider/orange_avoider.c"
+ * @author Felipe Bononi Bello
  */
-/**
- * Follow path and RFL mode
- * waypoints need to be implemented for follow_path
- */
+
+
 #include "modules/cnn_guided/cnn_guided.h"
-#include "firmwares/rotorcraft/guidance/guidance_h.h"
+#include "firmwares/rotorcraft/navigation.h"
 #include "generated/airframe.h"
 #include "state.h"
 #include "modules/core/abi.h"
-#include <stdio.h>
 #include <time.h>
+#include <stdio.h>
+
+#define NAV_C // needed to get the nav functions like Inside...
+#include "generated/flight_plan.h"
 
 #define CNN_VERBOSE TRUE
 
@@ -30,39 +30,68 @@
 #define VERBOSE_PRINT(...)
 #endif
 
-uint8_t chooseRandomIncrementAvoidance(void);
+void select_navigation_direction(const float forward_conf, const float right_conf, const float left_conf);
+bool shouldProceedForward(const float forward_conf, const float right_conf, const float left_conf);
+bool shouldTurnRight(const float forward_conf, const float right_conf, const float left_conf);
+bool shouldTurnLeft(const float forward_conf, const float right_conf, const float left_conf);
+void reset_turn_counters(void);
+void reset_forward_counter(void);
 
-enum navigation_state_t {
-  FOLLOW_PATH,
-  RFL_MODE,
-  OUT_OF_BOUNDS,
-  REENTER_ARENA, 
-  STATIONARY
-};
+
+static uint8_t moveWaypointForward(uint8_t waypoint, float distanceMeters);
+static uint8_t calculateForwards(struct EnuCoor_i *new_coor, float distanceMeters);
+static uint8_t moveWaypoint(uint8_t waypoint, struct EnuCoor_i *new_coor);
+static uint8_t increase_nav_heading();
+static uint8_t chooseRandomIncrementAvoidance(void);
+// void nav_set_heading_towards(float x, float y);
 
 // define settings
-float oag_max_speed = 0.5f;               // max flight speed [m/s]
-float oag_heading_rate = RadOfDeg(20.f);  // heading change setpoint for avoidance [rad/s]
-
+float oa_color_count_frac = 0.18f;
+int head = 45;
 // define and initialise global variables
-enum navigation_state_t navigation_state = STATIONARY;   // current state in state machine
-int16_t obstacle_free_confidence = 0;   // a measure of how certain we are that the way ahead if safe.
-float avoidance_heading_direction = 0;  // heading change direction for avoidance [rad/s]
+enum navigation_state_t navigation_state = PATH_FOLLOWING;
+int16_t obstacle_free_confidence = 0;   // a measure of how certain we are that the way ahead is safe.
+float heading_increment = 5.f;          // heading angle increment [deg]
+float maxDistance = 1.25;               // max waypoint displacement [m]
 
-const int16_t max_trajectory_confidence = 5;  // number of consecutive negative object detections to be sure we are obstacle free
+const int16_t max_trajectory_confidence = 5; // number of consecutive negative object detections to be sure we are obstacle free
 
 // create control input variables
-uint8_t send = 0 ;
+uint8_t sendqw = 0 ;
 float forward_conf = 0;
 float right_conf = 0;
 float left_conf = 0;
+
+float turning_threshold = 0.45;
+float turning_confidence = 0.2;
 
 // create memory variables
 int times_left;
 int times_right;
 int times_forward;
-int turns_made;
+int times_oob = 0; //outofbounds
+// create counters
+int count_left;
+int count_right;
+int count_forward;
 
+float new_heading;
+
+float current_heading;
+float x_dr;
+float y_dr;
+
+// define settings
+float oag_max_speed = 0.5f;               // max flight speed [m/s]
+float oag_heading_rate = RadOfDeg(30.f);  // heading change setpoint for avoidance [rad/s]
+
+/*
+ * This next section defines an ABI messaging event (http://wiki.paparazziuav.org/wiki/ABI), necessary
+ * any time data calculated in another module needs to be accessed. Including the file where this external
+ * data is defined is not enough, since modules are executed parallel to each other, at different frequencies,
+ * in different threads. The ABI event is triggered every time new data is sent out, and as such the function
+ * defined in this file does not need to be explicitly called, only bound in the init function
+ */
 // callback function to save control inputs
 // #ifndef CNN_CONTROL_INPUTS_ID
 // #define CNN_CONTROL_INPUTS_ID ABI_BROADCAST
@@ -70,14 +99,69 @@ int turns_made;
 static abi_event cnn_control; // create message variable __attribute__((unused))
 static void save_control_inputs(uint8_t sender_id, float right, float forward, float left)
 {
-  send = sender_id;
+  sendqw = sender_id;
   right_conf = right;
   forward_conf = forward;
   left_conf = left;
 }
 
+// Control navigation state
+// Improved Version of update_navigation_state
+void update_navigation_state(const float forward_conf, const float right_conf, const float left_conf) {
+    VERBOSE_PRINT("Before Update: State=%d, Forward=%d/%d, Left=%d/%d, Right=%d/%d\n", navigation_state, times_forward,count_forward, times_left,count_left, times_right, count_right);
+
+     if (!InsideObstacleZone(stateGetPositionEnu_f()->x, stateGetPositionEnu_f()->y)) {
+        navigation_state = OUT_OF_BOUNDS;
+    } else {
+      select_navigation_direction(forward_conf, right_conf, left_conf);
+    }
+
+    VERBOSE_PRINT("After Update: State=%d, Forward=%d/%d, Left=%d/%d, Right=%d/%d\n", navigation_state, times_forward,count_forward, times_left,count_left, times_right, count_right);
+}
+
+// New helper function for direction selection
+void select_navigation_direction(const float forward_conf, const float right_conf, const float left_conf) {
+    // Logic to select navigation direction based on confidence levels
+    if (shouldProceedForward(forward_conf, right_conf, left_conf)) {
+        navigation_state = FORWARD;
+        reset_turn_counters();
+    } else if (shouldTurnRight(forward_conf,right_conf, left_conf)) {
+        navigation_state = RIGHT;
+        reset_forward_counter();
+    } else if (shouldTurnLeft(forward_conf,right_conf, left_conf)) {
+        navigation_state = LEFT;
+        reset_forward_counter();
+    } else {
+        navigation_state = PATH_FOLLOWING;
+    }
+}
+
+// Further break down into smaller decision-making functions
+bool shouldProceedForward(const float forward_conf, const float right_conf, const float left_conf) {
+    return forward_conf > right_conf && forward_conf > left_conf && forward_conf>turning_threshold;
+}
+
+bool shouldTurnRight(const float forward_conf, const float right_conf, const float left_conf) {
+    return right_conf > forward_conf && right_conf > left_conf && navigation_state != LEFT && right_conf > turning_threshold ;//&& times_forward > 3;
+}
+
+bool shouldTurnLeft(const float forward_conf, const float right_conf, const float left_conf) {
+    return left_conf > forward_conf && left_conf > right_conf && navigation_state != RIGHT && left_conf > turning_threshold;// && times_forward > 3;
+}
+
+// Utility functions to reset counters
+void reset_turn_counters() {
+    times_left = 0;
+    times_right = 0;
+}
+
+void reset_forward_counter() {
+    times_forward = 0;
+}
+
+
 /*
- * Initialisation function
+ * Initialisation function,
  */
 void cnn_guided_init(void)
 {
@@ -90,94 +174,115 @@ void cnn_guided_init(void)
 }
 
 /*
- * Function that checks it is safe to move forwards, and then sets a forward velocity setpoint or changes the heading
+ * Function that checks it is safe to move forwards, and then moves a waypoint forward or changes the heading
  */
 void cnn_guided_periodic(void)
 {
+
   if (guidance_h.mode != GUIDANCE_H_MODE_GUIDED) {
-    navigation_state = STATIONARY;
+    navigation_state = PATH_FOLLOWING;
     obstacle_free_confidence = 0;
     return;
   }
 
-   // bound obstacle_free_confidence
+  current_heading = stateGetNedToBodyEulers_f()->psi;
+  
+  x_dr = stateGetPositionEnu_f()->x;
+  y_dr = stateGetPositionEnu_f()->y;
+  // normalize heading to [-pi, pi]
+  FLOAT_ANGLE_NORMALIZE(current_heading);
+
+  VERBOSE_PRINT("heading to %f, rad:%f\n", DegOfRad(current_heading), current_heading);
+  VERBOSE_PRINT("<><>----Heing=%f, pos_x=%f, pos_y=%f\n",DegOfRad(current_heading), x_dr, y_dr);
+  
+  // update our safe confidence
+  // if (forward_conf > right_conf && forward_conf > left_conf){
+  //   obstacle_free_confidence++;
+  // } else {
+  //   obstacle_free_confidence -= 1;  // be more cautious with positive obstacle detections
+  // }
+
+  // bound obstacle_free_confidence
   Bound(obstacle_free_confidence, 0, max_trajectory_confidence);
 
   float speed = fminf(oag_max_speed, 0.2f * obstacle_free_confidence);
-
-
-  // compute current forward threshold
-  int32_t forward_threshold = 0.35;
-
-  VERBOSE_PRINT("Left: %f  Forward: %f Right: %f \n", left_conf, forward_conf, right_conf);
-  // VERBOSE_PRINT("Obstacle free confidence: %d \n", obstacle_free_confidence);
-  // printf("ID: %u \n", send);
+  float moveDistance = fminf(maxDistance, 0.2f * obstacle_free_confidence);
   
-
-    // update our safe confidence using color threshold
-  if(forward_conf > right_conf && forward_conf > left_conf){
-    obstacle_free_confidence++;
-  } else {
-    obstacle_free_confidence -= 1;  // be more cautious with positive obstacle detections
-  }
-
-  if(obstacle_free_confidence==0){
-    navigation_state =RFL_MODE;
-  } else {
-    navigation_state = FOLLOW_PATH;
-  }
   
-
-
   switch (navigation_state){
-    case FOLLOW_PATH:
-      //FOLLOWING PATH 
+    case PATH_FOLLOWING:
+      // Move waypoint forward
+      // moveWaypointForward(WP_TRAJECTORY, 1.5f * moveDistance);
+      speed = forward_conf * oag_max_speed;
+      guidance_h_set_body_vel(speed, 0);
+      guidance_h_set_heading_rate(oag_heading_rate*(right_conf-left_conf));
+      nav.heading += 20*(right_conf-left_conf);
+      update_navigation_state(forward_conf, right_conf, left_conf);
+      
+      break;
+
+    case STATIONARY:
+      guidance_h_set_body_vel(0, 0);    
+      
+      update_navigation_state(forward_conf, right_conf, left_conf);
+
+
+    case FORWARD:
+      //FORWARD ONLY
       speed = forward_conf * oag_max_speed;
       guidance_h_set_body_vel(speed, 0);
       times_forward++;
+      count_forward++;
+      update_navigation_state(forward_conf, right_conf, left_conf);
       break;
-    case RFL_MODE:
-      if (right_conf > forward_conf && right_conf > left_conf && times_forward > 2){
-      speed = 0.1 * forward_conf * oag_max_speed;
+    case LEFT:
+      // LEFT SLIGHT FORWARD
+      speed = turning_confidence* forward_conf * oag_max_speed;
       guidance_h_set_body_vel(speed, 0);
-      guidance_h_set_heading_rate(RadOfDeg(15));
-      times_forward=0;
-    } else if (left_conf > forward_conf && left_conf > right_conf && times_forward > 2){
-        speed = 0.1 * forward_conf * oag_max_speed;
-        guidance_h_set_body_vel(speed, 0);
-        guidance_h_set_heading_rate(-RadOfDeg(15));
-        times_forward=0;
-    } else {
-      navigation_state =  FOLLOW_PATH;
-    }
-    // case RIGHT:
-    //   speed = 0.1 * forward_conf * oag_max_speed;
-    //   guidance_h_set_body_vel(speed, 0);
-    //   guidance_h_set_heading_rate(RadOfDeg(15));
-    //   times_right++;
+      guidance_h_set_heading_rate(-oag_heading_rate);
+      nav.heading-=45;
+      times_left++;
+      count_left++;
+      update_navigation_state(forward_conf, right_conf, left_conf);
+        
       break;
+    case RIGHT:
+      speed = turning_confidence * forward_conf * oag_max_speed;
+      guidance_h_set_body_vel(speed, 0);
+      guidance_h_set_heading_rate(oag_heading_rate);
+      nav.heading+=45;
+      times_right++;
+      count_right++;
+      update_navigation_state(forward_conf, right_conf, left_conf);
+
+      break;
+    
     case OUT_OF_BOUNDS:
-      // stop
-      guidance_h_set_body_vel(0, 0);
+      if (times_oob==0){ 
+      // current_heading = DegOfRad(stateGetNedToBodyEulers_f()->psi);
+      // nav_set_heading_towards(-8.5,0.5);
+      // guidance_h_set_heading_rate(oag_heading_rate);
+      increase_nav_heading();
+      }
+      speed = forward_conf * oag_max_speed;
+      guidance_h_set_body_vel(speed, 0);
+      // VERBOSE_PRINT("End------Heading=%d, pos_x=%d, pos_y=%d\n",heading_dr, x_dr, y_dr);
 
-      // start turn back into arena
-      guidance_h_set_heading_rate(avoidance_heading_direction * RadOfDeg(15));
-
-      navigation_state = REENTER_ARENA;
-
-      break;
-    case REENTER_ARENA:
-      // force floor center to opposite side of turn to head back into arena
-      // if (floor_count >= floor_count_threshold && avoidance_heading_direction * floor_centroid_frac >= 0.f){
-        // return to heading mode
-        guidance_h_set_heading(stateGetNedToBodyEulers_f()->psi);
-
+      times_oob++;
+      //0 heading straight up, left -90 ,right 90
+      if (InsideObstacleZone(stateGetPositionEnu_f()->x, stateGetPositionEnu_f()->y)){
+        // add offset to head back into arena
+        // increase_nav_heading(head);
         // reset safe counter
         obstacle_free_confidence = 0;
-
+        times_oob = 0;
+        nav.heading = 0;
         // ensure direction is safe before continuing
-        navigation_state = FOLLOW_PATH;
-      // }
+        navigation_state = FORWARD;
+        
+        guidance_h_set_heading_rate(0);
+      }
+      
       break;
     default:
       break;
@@ -187,28 +292,91 @@ void cnn_guided_periodic(void)
 
 
 /*
- * Sets the variable 'incrementForAvoidance' randomly positive/negative
+ * Increases the NAV heading. Assumes heading is an INT32_ANGLE. It is bound in this function.
+//  */
+uint8_t increase_nav_heading()
+{
+  current_heading = DegOfRad(stateGetNedToBodyEulers_f()->psi);
+  x_dr = stateGetPositionEnu_f()->x;
+  y_dr = stateGetPositionEnu_f()->y;
+  // normalize heading to [-pi, pi]
+  FLOAT_ANGLE_NORMALIZE(current_heading);
+
+  //Based on where the drone is in the obstacle field choose new heading
+  if (x_dr>1 && y_dr>-1){
+    new_heading = current_heading+RadOfDeg(-45); 
+  } else if (x_dr>-1 && y_dr<-1){
+    new_heading = current_heading+RadOfDeg(-135);
+  } else if (x_dr<1 && y_dr>1){
+    new_heading = current_heading+RadOfDeg(45);//-- +
+  } else if (x_dr<1 && y_dr>1){
+    new_heading = current_heading+RadOfDeg(135);//-- +
+  } else{
+    new_heading = current_heading+RadOfDeg(180);
+  }
+  FLOAT_ANGLE_NORMALIZE(new_heading)
+  // float new_heading = stateGetNedToBodyEulers_f()->psi+RadOfDeg(incrementDegrees);
+  // set heading, declared in firmwares/rotorcraft/navigation.h
+  nav.heading = new_heading;
+  guidance_h_set_heading_rate(oag_heading_rate);
+  
+  VERBOSE_PRINT("NEWHEADING=%f, pos_x=%f, pos_y=%f\n",DegOfRad(new_heading), x_dr, y_dr);
+  return false;
+}
+
+// /*
+//  * Calculates coordinates of distance forward and sets waypoint 'waypoint' to those coordinates
+//  */
+uint8_t moveWaypointForward(uint8_t waypoint, float distanceMeters)
+{
+  struct EnuCoor_i new_coor;
+  calculateForwards(&new_coor, distanceMeters);
+  moveWaypoint(waypoint, &new_coor);
+
+  return false;
+}
+
+/*
+ * Calculates coordinates of a distance of 'distanceMeters' forward w.r.t. current position and heading
+//  */
+uint8_t calculateForwards(struct EnuCoor_i *new_coor, float distanceMeters)
+{
+  float heading  = stateGetNedToBodyEulers_f()->psi;
+
+  // Now determine where to place the waypoint you want to go to
+  new_coor->x = stateGetPositionEnu_i()->x + POS_BFP_OF_REAL(sinf(heading) * (distanceMeters));
+  new_coor->y = stateGetPositionEnu_i()->y + POS_BFP_OF_REAL(cosf(heading) * (distanceMeters));
+  VERBOSE_PRINT("Calculated %f m forward position. x: %f  y: %f based on pos(%f, %f) and heading(%f)\n", distanceMeters,	
+                POS_FLOAT_OF_BFP(new_coor->x), POS_FLOAT_OF_BFP(new_coor->y),
+                stateGetPositionEnu_f()->x, stateGetPositionEnu_f()->y, DegOfRad(heading));
+  return false;
+}
+
+// /*
+//  * Sets waypoint 'waypoint' to the coordinates of 'new_coor'
+//  */
+uint8_t moveWaypoint(uint8_t waypoint, struct EnuCoor_i *new_coor)
+{
+  VERBOSE_PRINT("Moving waypoint %d to x:%f y:%f\n", waypoint, POS_FLOAT_OF_BFP(new_coor->x),
+                POS_FLOAT_OF_BFP(new_coor->y));
+  waypoint_move_xy_i(waypoint, new_coor->x, new_coor->y);
+  //if waypoint inside r of middle go forward x amount of meters.
+  return false;
+}
+
+/*
+ * Sets the variable 'heading_increment' randomly positive/negative
  */
 uint8_t chooseRandomIncrementAvoidance(void)
 {
   // Randomly choose CW or CCW avoiding direction
-  // if (right_conf>left_conf) {
-  //   
-  // } else {
-  //   avoidance_heading_direction = -1.f;
-  // }
-  avoidance_heading_direction = 1.f;
+  if (rand() % 2 == 0) {
+    heading_increment = 5.f;
+    VERBOSE_PRINT("Set avoidance increment to: %f\n", heading_increment);
+  } else {
+    heading_increment = -5.f;
+    VERBOSE_PRINT("Set avoidance increment to: %f\n", heading_increment);
+  }
   return false;
 }
 
-/* Navigation states
-FORWARD ->        fly forward with speed based on confidence and direction based on right / left confidence (within bounds)
-LEFT ->           set forwared sped to 0 and start turning left, if forward is more confident than left, state = FORWARD,
-                  if left did more than 360 deg, go state UP or DOWN (randomly)
-UP ->             go up x distance, then go state LEFT or RIGHT (randomly)
-DOWN ->           go down x distance, then go state LEFT or RIGHT (randomly)
-RIGHT ->          set forward speed to 0 and start turning right, if forward is more confident than right, state = FORWARD,
-                  if right did more than 360 deg, go state UP or DOWN (randomly)
-OUT_OF_BOUNDS ->  stop, turn back into arena, state = REENTER_ARENA
-REENTER_ARENA ->  rotate until a safe forward direction into arena is found, state = FORWARD
-*/
