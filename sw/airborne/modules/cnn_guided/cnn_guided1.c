@@ -265,7 +265,7 @@ void cnn_guided_periodic(void)
       guidance_h_set_body_vel(speed, 0);
       // VERBOSE_PRINT("End------Heading=%d, pos_x=%d, pos_y=%d\n",heading_dr, x_dr, y_dr);
 
-      
+      times_oob++;
       //0 heading straight up, left -90 ,right 90
       if (InsideObstacleZone(stateGetPositionEnu_f()->x, stateGetPositionEnu_f()->y)){
         // add offset to head back into arena
@@ -273,11 +273,11 @@ void cnn_guided_periodic(void)
         // reset safe counter
         obstacle_free_confidence = 0;
         times_oob = 0;
-        nav.heading = 0;
+        // nav.heading = 0;
         // ensure direction is safe before continuing
-        navigation_state = PATH_FOLLOWING;
+        navigation_state = FORWARD;
       }
-      times_oob++;
+      
       break;
     default:
       break;
