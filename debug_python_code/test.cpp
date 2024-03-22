@@ -23,6 +23,9 @@ RUN:
 ./test ./cyberzoo_poles_panels_mats/20190121-142935/
 */
 
+
+#define IMAGE_WIDTH 520
+
 namespace fs = std::filesystem;
 
 int length(cv::Mat &image, cv::Vec4i line) {
@@ -191,10 +194,14 @@ int main(int argc, char** argv) {
     char key = 0;
 
     while (key != 'q') {
+
+
         cv::Mat frame = cv::imread(image_files[current_index]);if (frame.empty()) {
             std::cerr << "Error: Unable to load input image." << std::endl;
             return -1;
         }
+
+        std::vector<bool> free_space(IMAGE_WIDTH);
 
         // Rotate the image
         cv::transpose(frame, frame);
@@ -274,22 +281,25 @@ int main(int argc, char** argv) {
                 }
             }
 
-            for(int i = 0; i <= 1; i++) {
+            for(int i = 0; i < 2; i++) {
                 if(lengths[i] > 0) {
                     int range_x[2] = {center[0] * i, center[0] * static_cast<int> (! static_cast<bool>(i)) + edges.cols * i};
                     final_lines[i] = performLinearRegressionWithGuess(edges, final_lines[i], range_x);
                     cv::cvtColor(edges, colored, cv::COLOR_GRAY2BGR);
-                    //cv::line(colored, cv::Point(final_lines[i][0], final_lines[i][1]), cv::Point(final_lines[i][2], final_lines[i][3]), cv::Scalar(0, 255, 0), 1);
+                    cv::line(colored, cv::Point(final_lines[i][0], final_lines[i][1]), cv::Point(final_lines[i][2], final_lines[i][3]), cv::Scalar(0, 255, 0), 1);
                     int x1 = final_lines[i][0], y1 = final_lines[i][1], x2 = final_lines[i][2], y2 = final_lines[i][3];
                     float dydx = static_cast<float>(y2 - y1) / static_cast<float>(x2 - x1);
                     for (int x = x1; x <= x2; x += 5) {
                         int y = y1 + dydx * (x - x1);
                         bool valid = false;
+                        // implement curvature
                         for (int j = -2; j <= 2; j++) {
                             int newY = y + j;
                             colored.at<cv::Vec3b>(newY, x) == cv::Vec3b(255, 255, 255);
                             if (newY >= 0 && newY < edges.rows && edges.at<uchar>(newY, x) == 255) {
                                 valid = true;
+                                free_space[x] = true
+                                break
                             }
                         }
                         if(!valid && y >= 0 && y < edges.rows) {
