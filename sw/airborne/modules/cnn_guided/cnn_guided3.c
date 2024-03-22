@@ -41,7 +41,7 @@ void reset_forward_counter(void);
 static uint8_t moveWaypointForward(uint8_t waypoint, float distanceMeters);
 static uint8_t calculateForwards(struct EnuCoor_i *new_coor, float distanceMeters);
 static uint8_t moveWaypoint(uint8_t waypoint, struct EnuCoor_i *new_coor);
-static uint8_t increase_nav_heading();
+static uint8_t increase_nav_heading(float incrementDegrees);
 static uint8_t chooseRandomIncrementAvoidance(void);
 // void nav_set_heading_towards(float x, float y);
 
@@ -83,7 +83,7 @@ float y_dr;
 
 // define settings
 float oag_max_speed = 0.5f;               // max flight speed [m/s]
-float oag_heading_rate = RadOfDeg(30.f);  // heading change setpoint for avoidance [rad/s]
+float oag_heading_rate = RadOfDeg(20.f);  // heading change setpoint for avoidance [rad/s]
 
 /*
  * This next section defines an ABI messaging event (http://wiki.paparazziuav.org/wiki/ABI), necessary
@@ -185,15 +185,14 @@ void cnn_guided_periodic(void)
     return;
   }
 
-  current_heading = stateGetNedToBodyEulers_f()->psi;
-  
-  x_dr = stateGetPositionEnu_f()->x;
-  y_dr = stateGetPositionEnu_f()->y;
-  // normalize heading to [-pi, pi]
-  FLOAT_ANGLE_NORMALIZE(current_heading);
+ 
+  // x_dr = stateGetPositionEnu_f()->x;
+  // y_dr = stateGetPositionEnu_f()->y;
+  // // normalize heading to [-pi, pi]
+ 
 
-  VERBOSE_PRINT("heading to %f, rad:%f\n", DegOfRad(current_heading), current_heading);
-  VERBOSE_PRINT("<><>----Heing=%f, pos_x=%f, pos_y=%f\n",DegOfRad(current_heading), x_dr, y_dr);
+  // VERBOSE_PRINT("heading to %f, rad:%f\n", DegOfRad(current_heading), current_heading);
+  // VERBOSE_PRINT("<><>----Heing=%f, pos_x=%f, pos_y=%f\n",DegOfRad(nav.heading), x_dr, y_dr);
   
   // update our safe confidence
   // if (forward_conf > right_conf && forward_conf > left_conf){
@@ -212,12 +211,17 @@ void cnn_guided_periodic(void)
   switch (navigation_state){
     case PATH_FOLLOWING:
       // Move waypoint forward
-      // moveWaypointForward(WP_TRAJECTORY, 1.5f * moveDistance);
-      speed = forward_conf * oag_max_speed;
-      guidance_h_set_body_vel(speed, 0);
-      guidance_h_set_heading_rate(oag_heading_rate*(right_conf-left_conf));
-      nav.heading += 20*(right_conf-left_conf);
-      update_navigation_state(forward_conf, right_conf, left_conf);
+      moveWaypointForward(WP_TRAJECTORY, 0.5f);
+      if (!InsideObstacleZone(WaypointX(WP_TRAJECTORY),WaypointY(WP_TRAJECTORY))){
+        navigation_state = OUT_OF_BOUNDS;
+      } else {
+        speed = forward_conf * oag_max_speed;
+        guidance_h_set_body_vel(speed, 0);
+        guidance_h_set_heading_rate(oag_heading_rate*(right_conf-left_conf));
+        // nav.heading += 20*(right_conf-left_conf);
+        update_navigation_state(forward_conf, right_conf, left_conf);
+      }
+      
       
       break;
 
@@ -229,60 +233,69 @@ void cnn_guided_periodic(void)
 
     case FORWARD:
       //FORWARD ONLY
+      moveWaypointForward(WP_TRAJECTORY, 0.5f);
+
+
+      if (!InsideObstacleZone(WaypointX(WP_TRAJECTORY),WaypointY(WP_TRAJECTORY))){
+        navigation_state = OUT_OF_BOUNDS;
+      } else {
       speed = forward_conf * oag_max_speed;
       guidance_h_set_body_vel(speed, 0);
       times_forward++;
       count_forward++;
       update_navigation_state(forward_conf, right_conf, left_conf);
+      }
       break;
     case LEFT:
       // LEFT SLIGHT FORWARD
+      moveWaypointForward(WP_TRAJECTORY, 0.5f );
+
+
+      if (!InsideObstacleZone(WaypointX(WP_TRAJECTORY),WaypointY(WP_TRAJECTORY))){
+        navigation_state = OUT_OF_BOUNDS;
+      } else {
       speed = turning_confidence* forward_conf * oag_max_speed;
       guidance_h_set_body_vel(speed, 0);
       guidance_h_set_heading_rate(-oag_heading_rate);
-      nav.heading-=45;
+      // nav.heading-=45;
       times_left++;
       count_left++;
       update_navigation_state(forward_conf, right_conf, left_conf);
-        
+      } 
       break;
     case RIGHT:
+      moveWaypointForward(WP_TRAJECTORY, 0.5f);
+
+
+      if (!InsideObstacleZone(WaypointX(WP_TRAJECTORY),WaypointY(WP_TRAJECTORY))){
+        navigation_state = OUT_OF_BOUNDS;
+      } else {
       speed = turning_confidence * forward_conf * oag_max_speed;
       guidance_h_set_body_vel(speed, 0);
       guidance_h_set_heading_rate(oag_heading_rate);
-      nav.heading+=45;
+      // nav.heading+=45;
       times_right++;
       count_right++;
       update_navigation_state(forward_conf, right_conf, left_conf);
-
+      }
       break;
     
     case OUT_OF_BOUNDS:
-      if (times_oob==0){ 
-      // current_heading = DegOfRad(stateGetNedToBodyEulers_f()->psi);
-      // nav_set_heading_towards(-8.5,0.5);
-      // guidance_h_set_heading_rate(oag_heading_rate);
-      increase_nav_heading();
-      }
-      speed = forward_conf * oag_max_speed;
-      guidance_h_set_body_vel(speed, 0);
-      // VERBOSE_PRINT("End------Heading=%d, pos_x=%d, pos_y=%d\n",heading_dr, x_dr, y_dr);
+      guidance_h_set_body_vel(0, 0);
+      increase_nav_heading(oag_heading_rate);
+      moveWaypointForward(WP_TRAJECTORY, 1.5f);
 
-      times_oob++;
-      //0 heading straight up, left -90 ,right 90
-      if (InsideObstacleZone(stateGetPositionEnu_f()->x, stateGetPositionEnu_f()->y)){
+      if (InsideObstacleZone(WaypointX(WP_TRAJECTORY),WaypointY(WP_TRAJECTORY))){
         // add offset to head back into arena
-        // increase_nav_heading(head);
+        increase_nav_heading(oag_heading_rate);
+        VERBOSE_PRINT("IM IN!!!. heading to %f, rad:%f\n", DegOfRad(current_heading), current_heading);
+  
         // reset safe counter
         obstacle_free_confidence = 0;
-        times_oob = 0;
-        nav.heading = 0;
+
         // ensure direction is safe before continuing
-        navigation_state = FORWARD;
-        
-        guidance_h_set_heading_rate(0);
-      }
-      
+        navigation_state = PATH_FOLLOWING;
+      } 
       break;
     default:
       break;
@@ -294,33 +307,19 @@ void cnn_guided_periodic(void)
 /*
  * Increases the NAV heading. Assumes heading is an INT32_ANGLE. It is bound in this function.
 //  */
-uint8_t increase_nav_heading()
-{
-  current_heading = DegOfRad(stateGetNedToBodyEulers_f()->psi);
-  x_dr = stateGetPositionEnu_f()->x;
-  y_dr = stateGetPositionEnu_f()->y;
-  // normalize heading to [-pi, pi]
-  FLOAT_ANGLE_NORMALIZE(current_heading);
 
-  //Based on where the drone is in the obstacle field choose new heading
-  if (x_dr>1 && y_dr>-1){
-    new_heading = current_heading+RadOfDeg(-45); 
-  } else if (x_dr>-1 && y_dr<-1){
-    new_heading = current_heading+RadOfDeg(-135);
-  } else if (x_dr<1 && y_dr>1){
-    new_heading = current_heading+RadOfDeg(45);//-- +
-  } else if (x_dr<1 && y_dr>1){
-    new_heading = current_heading+RadOfDeg(135);//-- +
-  } else{
-    new_heading = current_heading+RadOfDeg(180);
-  }
-  FLOAT_ANGLE_NORMALIZE(new_heading)
-  // float new_heading = stateGetNedToBodyEulers_f()->psi+RadOfDeg(incrementDegrees);
+uint8_t increase_nav_heading(float incrementDegrees)
+{
+  float new_heading = stateGetNedToBodyEulers_f()->psi + incrementDegrees;
+
+  // normalize heading to [-pi, pi]
+  // FLOAT_ANGLE_NORMALIZE(new_heading);
+
   // set heading, declared in firmwares/rotorcraft/navigation.h
-  nav.heading = new_heading;
+  // nav.heading = new_heading;
+  VERBOSE_PRINT("new_heading*oag_heading_rate):%f",new_heading*oag_heading_rate);
   guidance_h_set_heading_rate(oag_heading_rate);
-  
-  VERBOSE_PRINT("NEWHEADING=%f, pos_x=%f, pos_y=%f\n",DegOfRad(new_heading), x_dr, y_dr);
+  VERBOSE_PRINT("Increasing heading to %f\n", DegOfRad(new_heading));
   return false;
 }
 
@@ -357,8 +356,8 @@ uint8_t calculateForwards(struct EnuCoor_i *new_coor, float distanceMeters)
 //  */
 uint8_t moveWaypoint(uint8_t waypoint, struct EnuCoor_i *new_coor)
 {
-  VERBOSE_PRINT("Moving waypoint %d to x:%f y:%f\n", waypoint, POS_FLOAT_OF_BFP(new_coor->x),
-                POS_FLOAT_OF_BFP(new_coor->y));
+  // VERBOSE_PRINT("Moving waypoint %d to x:%f y:%f\n", waypoint, POS_FLOAT_OF_BFP(new_coor->x),
+                // POS_FLOAT_OF_BFP(new_coor->y));
   waypoint_move_xy_i(waypoint, new_coor->x, new_coor->y);
   //if waypoint inside r of middle go forward x amount of meters.
   return false;
