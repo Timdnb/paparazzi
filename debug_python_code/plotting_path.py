@@ -9,13 +9,19 @@ def plot_csv_data(csv_file):
     # Read data from CSV file
     with open(csv_file, 'r') as file:
         csv_reader = csv.reader(file)
+        
         next(csv_reader)  # Skip header if exists
-        for row in csv_reader:
+        next(csv_reader)
+        for i, row in enumerate(csv_reader):
+            if i % 2:
+                continue
             # Extract x and y positions from 2nd and 3rd columns
             x = float(row[1])  # Assuming 2nd column contains x position
             y = float(row[2])  # Assuming 3rd column contains y position
             x_positions.append(x)
             y_positions.append(y)
+
+    print(i)
 
     # Plot the data
     plt.figure(figsize=(8, 6))
@@ -27,5 +33,5 @@ def plot_csv_data(csv_file):
     plt.show()
 
 # Example usage: Provide the path to your CSV file
-csv_file_path = '20240315-113451.csv'
+csv_file_path = '20240322-120422-cornerdata.csv'
 plot_csv_data(csv_file_path)
