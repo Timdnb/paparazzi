@@ -1,0 +1,122 @@
+<!DOCTYPE module SYSTEM "module.dtd">
+
+<module name="opencv_approach" dir="computer_vision">
+  <doc>
+    <description>Color Object Detector
+    Detects an object by a continuous color. Optionally draws on image.
+    </description>
+
+    <define name="CNN_CAMERA" value="front_camera|bottom_camera" description="Video device to use"/>
+    <define name="CNN_FPS" value="0" description="Desired FPS (0: camera rate)"/>
+  </doc>
+
+  <!-- <settings>
+    <dl_settings>
+      <dl_settings name="ColorObjectDetector">
+         <dl_setting var="cod_lum_min1" min="0" step="1" max="255" shortname="y_min1"/>
+         <dl_setting var="cod_lum_max1" min="0" step="1" max="255" shortname="y_max1"/>
+         <dl_setting var="cod_cb_min1"   min="0" step="1" max="255" shortname="u_min1"/>
+         <dl_setting var="cod_cb_max1"   min="0" step="1" max="255" shortname="u_max1"/>
+         <dl_setting var="cod_cr_min1"   min="0" step="1" max="255" shortname="v_min1"/>
+         <dl_setting var="cod_cr_max1"   min="0" step="1" max="255" shortname="v_max1"/>
+         <dl_setting var="cod_draw1"  min="0" step="1" max="1" values="False|True" shortname="draw 1" />
+         <dl_setting var="cod_lum_min2" min="0" step="1" max="255" shortname="y_min2"/>
+         <dl_setting var="cod_lum_max2" min="0" step="1" max="255" shortname="y_max2"/>
+         <dl_setting var="cod_cb_min2"   min="0" step="1" max="255" shortname="u_min2"/>
+         <dl_setting var="cod_cb_max2"   min="0" step="1" max="255" shortname="u_max2"/>
+         <dl_setting var="cod_cr_min2"   min="0" step="1" max="255" shortname="v_min2"/>
+         <dl_setting var="cod_cr_max2"   min="0" step="1" max="255" shortname="v_max2"/>
+         <dl_setting var="cod_draw2"  min="0" step="1" max="1" values="False|True" shortname="draw 2" />
+      </dl_settings>
+    </dl_settings>
+  </settings> -->
+
+  <dep>
+    <depends>video_thread</depends>
+  </dep>
+
+  <header>
+    <file name="opencv_approach.h"/>
+  </header>
+
+  <init fun="opencv_init()"/>
+  <!-- <periodic fun="color_object_detector_periodic()" freq="50"/> -->
+  <!-- <makefile target="ap|nps">
+    <file name="opencv_approach.cpp"/>
+  </makefile> -->
+
+
+
+
+
+
+
+
+
+
+
+
+    <makefile target="ap">
+    <!-- <file name="cv_opencvdemo.c"/> -->
+    <file name="opencv_approach.cpp"/>
+    <file name="opencv_image_functions.cpp"/>
+
+    <flag name="CXXFLAGS" value="I$(PAPARAZZI_SRC)/sw/ext/opencv_bebop/install_arm/include"/>
+    
+    <flag name="LDFLAGS" value="L$(PAPARAZZI_HOME)/sw/ext/opencv_bebop/install_arm/lib"/>
+    <flag name="LDFLAGS" value="lopencv_world"/>
+    <flag name="LDFLAGS" value="L$(PAPARAZZI_HOME)/sw/ext/opencv_bebop/install_arm/share/OpenCV/3rdparty/lib"/>
+    <flag name="LDFLAGS" value="llibprotobuf"/>
+    <flag name="LDFLAGS" value="llibjpeg-turbo"/>
+    <flag name="LDFLAGS" value="llibpng"/>
+    <flag name="LDFLAGS" value="llibtiff"/>
+    <flag name="LDFLAGS" value="lzlib"/>
+    <flag name="LDFLAGS" value="lquirc"/>
+    <flag name="LDFLAGS" value="ltegra_hal"/>
+    <flag name="LDFLAGS" value="ldl"/>
+    <flag name="LDFLAGS" value="lm"/>
+    <flag name="LDFLAGS" value="lpthread"/>
+    <flag name="LDFLAGS" value="lrt"/>
+  </makefile>
+  <makefile target="nps">
+    <!-- <file name="cv_opencvdemo.c"/> -->
+    <file name="opencv_approach.cpp"/>
+    <file name="opencv_image_functions.cpp"/>
+    <flag name="CXXFLAGS" value="I/usr/local/include/opencv4"/>
+    <!-- <flag name="CXXFLAGS" value="I$(PAPARAZZI_SRC)/sw/ext/opencv_bebop/install_pc/include"/> -->
+    
+    <!-- <flag name="LDFLAGS" value="L$(PAPARAZZI_HOME)/sw/ext/opencv_bebop/install_pc/lib"/> -->
+    <!-- <flag name="LDFLAGS" value="L/usr/local/lib"/>
+    <flag name="LDFLAGS" value="lopencv_world"/> -->
+
+    <!-- <flag name="LDFLAGS" value="L$(PAPARAZZI_HOME)/sw/ext/opencv_bebop/install_pc/share/OpenCV/3rdparty/lib"/>
+    <flag name="LDFLAGS" value="L$(PAPARAZZI_HOME)/sw/ext/opencv_bebop/install_pc/share/OpenCV4/3rdparty/lib"/> -->
+    <!-- <flag name="LDFLAGS" value="llibprotobuf"/>
+    <flag name="LDFLAGS" value="lquirc"/>
+    <flag name="LDFLAGS" value="L/usr/lib/x86_64-linux-gnu"/>
+    <flag name="LDFLAGS" value="ljpeg"/>
+    <flag name="LDFLAGS" value="lpng"/>
+    <flag name="LDFLAGS" value="ltiff"/>
+    <flag name="LDFLAGS" value="L/usr/lib/x86_64-linux-gnu/hdf5/serial"/>
+    <flag name="LDFLAGS" value="lhdf5"/>
+    <flag name="LDFLAGS" value="lpthread"/>
+    <flag name="LDFLAGS" value="lsz"/>
+    <flag name="LDFLAGS" value="lz"/>
+    <flag name="LDFLAGS" value="ldl"/>
+    <flag name="LDFLAGS" value="lm"/>
+    <flag name="LDFLAGS" value="lfreetype"/>
+    <flag name="LDFLAGS" value="lharfbuzz"/>
+    <flag name="LDFLAGS" value="lrt"/> -->
+  </makefile>
+
+
+
+
+
+
+
+
+
+  
+</module>
+
