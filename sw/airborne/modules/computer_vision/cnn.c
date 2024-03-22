@@ -67,7 +67,7 @@ static struct image_t *cnn_func(struct image_t *img, uint8_t camera_id __attribu
   // draw rectangles on the original image corresponding to the outputs
   // TODO: improve code
   int x_min_left = 10;
-  int x_max_left = 10 + (int)(tensor_output[0][2] * 40);
+  int x_max_left = 10 + (int)(tensor_output[0][0] * 40);
   int y_min_left = 10;
   int y_max_left = 30;
   image_draw_rectangle(img, x_min_left, x_max_left, y_min_left, y_max_left, white);
@@ -78,14 +78,17 @@ static struct image_t *cnn_func(struct image_t *img, uint8_t camera_id __attribu
   int y_max_forward = 55;
   image_draw_rectangle(img, x_min_forward, x_max_forward, y_min_forward, y_max_forward, white);
 
-    int x_min_right = 10;
-  int x_max_right = 10 + (int)(tensor_output[0][0] * 40);
+  int x_min_right = 10;
+  int x_max_right = 10 + (int)(tensor_output[0][1] * 40);
   int y_min_rigth = 60;
   int y_max_right = 80;
   image_draw_rectangle(img, x_min_right, x_max_right, y_min_rigth, y_max_right, white);
 
   // // Print outputs
   // printf("Right: %f, Forward: %f, Left: %f\n", tensor_output[0][0], tensor_output[0][1], tensor_output[0][2]);
+
+  // Print
+  printf("Processed image!");
 
   // Send outputs
   AbiSendMsgCNN_CONTROL_INPUTS(CNN_CONTROL_INPUTS_ID, tensor_output[0][0], tensor_output[0][1], tensor_output[0][2]);

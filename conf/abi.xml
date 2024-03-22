@@ -249,9 +249,9 @@
     </message>
 
     <message name="CNN_CONTROL_INPUTS" id="37">
-      <field name="right"   type="float">Confidence to turn right</field>
+      <field name="left"   type="float">Confidence to turn right</field>
       <field name="forward" type="float">Confidence to go forward</field>
-      <field name="left"    type="float">Confidence to turn left</field>
+      <field name="right"    type="float">Confidence to turn left</field>
     </message>
 
   </msg_class>
