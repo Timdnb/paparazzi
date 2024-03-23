@@ -53,6 +53,11 @@
         <arg flag="-zoom" constant="40."/>
       </program>
       <program name="Gazebo"/>
+      <program command="sw/tools/rtp_viewer/rtp_viewer.py" name="RtpViewer">
+        <arg constant="5000" flag="-p" />
+        <arg constant="0.75" flag="-s" />
+        <arg constant="3" flag="-r" />
+      </program>
     </session>
     <session name="Simulation - Gazebo + Joystick">
       <program name="Simulator">

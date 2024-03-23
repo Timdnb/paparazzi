@@ -47,8 +47,10 @@ using namespace std;
 using namespace cv;
 #include "opencv_image_functions.h"
 
-// namespace fs = std::filesystem;
+#define IMAGE_WIDTH 520
+#define Y_MAX 120
 
+// namespace fs = std::filesystem;
 
 int length(cv::Mat &image, cv::Vec4i line) {
     //printf("Image shape: (%d, %d)\n", image.rows, image.cols);
@@ -66,7 +68,8 @@ int length(cv::Mat &image, cv::Vec4i line) {
             if (x >= 0 && x < image.cols && ty >= 0 && ty < image.rows) {
                 //printf("x: %u, y: %u -> pixel: %hhu\n", x, ty, image.at<uchar>(ty, x) == 255);
                 // Check if the pixel is white (assuming white is 255 in grayscale)
-                if (image.at<uchar>(ty, x) == 255) {
+                //if (image.at<uchar>(ty, x) == 255) {
+                if (image.at<uint8_t>(x, y) == 255) {
                     count++;
                     break;
                 }
@@ -75,6 +78,16 @@ int length(cv::Mat &image, cv::Vec4i line) {
     }
     
     return count;
+}
+
+void fill_regions(std::array<float, 3> &regions, std::array<bool, IMAGE_WIDTH> &free_space) {
+    for(int i = 0; i < IMAGE_WIDTH; i++) {
+        regions[i / (IMAGE_WIDTH / 3)] += static_cast<float>(free_space[i]);
+    }
+    float size = regions[0] + regions[1] + regions[2]; 
+    for(int i = 0; i < 3; i++) {
+        regions[i] /= size;
+    }
 }
 
 std::array<int, 2> findIntersection(cv::Vec4i line1, cv::Vec4i line2) {
@@ -121,7 +134,7 @@ cv::Vec4f performLinearRegressionWithGuess(cv::Mat binaryImage, cv::Vec4i model,
     const int ACCEPT_REGION = 10;
 
     std::vector<std::vector<int>> points;
-
+    // TODO CHANGE ORIENTATION
     int x0 = model[0];
     int y0 = model[1];
     int x1 = model[2];
@@ -137,7 +150,8 @@ cv::Vec4f performLinearRegressionWithGuess(cv::Mat binaryImage, cv::Vec4i model,
         int prediction = static_cast<int>(m * x + b);
 
         for (int y = std::max(0, prediction - ACCEPT_REGION); y <= std::min(binaryImage.rows - 1, prediction + ACCEPT_REGION); y++) {
-            if(binaryImage.at<uchar>(y, x) == 255) {
+            //if(binaryImage.at<uchar>(y, x) == 255) {
+            if(binaryImage.at<uint8_t>(x, y) == 255) {
                 int newDistance = abs(y - prediction);
                 if (newDistance < distance) {
                     bestY = y;
@@ -194,83 +208,74 @@ cv::Vec4f performLinearRegressionWithGuess(cv::Mat binaryImage, cv::Vec4i model,
 }
 
 
-struct image_t gray;
-
 // uint8_t white[4] = {127, 255, 127, 255};
 
 // Function
 static struct image_t *opencv_func(struct image_t *img, uint8_t camera_id __attribute__((unused)))
 {
-  // TODO: freeing of images ?
   // convert to grayscale, but also keep original for live feed
-  
-  // image_create(&gray, img->w, img->h, IMAGE_GRAYSCALE);
-  // image_to_grayscale(img, &gray);
-
-  // char key = 0;
-  Mat M(img->h, img->w, CV_8UC2, img);
-  Mat image_cv;
-
-  cvtColor(M, image_cv, COLOR_YUV2GRAY_Y422);
-  // Rotate the image
-  cv::transpose(image_cv, image_cv);
-  cv::flip(image_cv, image_cv, 0);
-
-  // Convert to grayscale
   cv::Mat gray;
-  cv::cvtColor(image_cv, gray, COLOR_RGB2GRAY);
+  Mat img_mat(img->h, img->w, CV_8UC2, img->buf);
+  cvtColor(img_mat, gray, COLOR_YUV2GRAY_Y422);
 
   // Apply Gaussian blur
   cv::GaussianBlur(gray, gray, cv::Size(15, 15), 0.9);
 
   // Detect edges using Canny edge detector
+  // Now we could use only gray instead of creating edges
   cv::Mat edges;
   cv::Canny(gray, edges, 15, 20);
 
-  // First guess
-  int y_min = 120;
-  // Consider only edges from the region where y > 150
-  cv::Mat edges_roi = edges(cv::Rect(0, y_min, edges.cols, edges.rows - y_min));
+  // Ignore upper part of the image
+  // Our width is the y range in this configuration
+  //cv::Mat lower_image = edges(cv::Rect(0, 0, edges.cols, Y_MAX));
+  cv::Mat lower_image = edges(cv::Rect(0, 0, Y_MAX, edges.rows));
 
   // Remove unwanted elements
-  remove_mess(edges_roi);
+  remove_mess(lower_image);
 
-  // Detect lines using Hough transform
-  std::vector<cv::Vec4i> lines;
-  cv::HoughLinesP(edges_roi, lines, 3, 5 * CV_PI / 180, 10, 100, 30);
-
-  // Convert edges to colored image (for displaying)
-  cv::Mat colored(edges.size(), CV_8UC3);
-  cv::cvtColor(edges, colored, cv::COLOR_GRAY2BGR);
-
-  // Draw detected lines on the colored image
-  // printf("\n--- %u ---\n", current_index);
-
-  cv::Vec4i final_lines[2] = {cv::Vec4i(0, 0, 0, 0), cv::Vec4i(0, 0, 0, 0)};
-  int lengths[2] = {0, 0};
-  for (size_t i = 0; i < lines.size(); i++) {
-      cv::Vec4i line = lines[i];
-      line[1] += y_min;
-      line[3] += y_min;
-      float angle = atan2(line[3] - line[1], line[2] - line[0]) * 180 / CV_PI;
-      if (std::abs(angle) < 45) {
-          int len = length(edges, line);
-          int idx = static_cast<int> (angle > 0);
-          if (len > lengths[idx]) {
-              lengths[idx] = len;
-              final_lines[idx] = line;
+  // DEBUG
+  for (int y = 0; y < edges.rows; ++y) {
+      for (int x = 0; x < edges.cols; ++x) {
+          //printf("(%d, %d): %hhd", x, y, gray.at<uchar>(y, x));
+          if (edges.at<uchar>(y, x) == 255) {
+              // Set the corresponding pixel in img_mat to white
+              img_mat.at<cv::Vec2b>(y, x) = cv::Vec2b(255, 255);
           }
       }
   }
+
+  // Detect lines using Hough transform
+  std::vector<cv::Vec4i> lines;
+  cv::HoughLinesP(lower_image, lines, 1, 1 * CV_PI / 180, 10, 30, 10);
+
+  cv::Vec4i final_lines[2] = {cv::Vec4i(0, 0, 0, 0), cv::Vec4i(0, 0, 0, 0)};
+  int lengths[2] = {0, 0};
+  for (int i = 0; i < lines.size(); i++) {
+      cv::Vec4i line = lines[i];
+      //float angle = atan2(line[3] - line[1], line[2] - line[0]) * 180 / CV_PI;
+      //if (std::abs(angle) < 45) {
+      //    int len = length(edges, line);
+      //    int idx = static_cast<int> (angle > 0);
+      //    if (len > lengths[idx]) {
+      //        lengths[idx] = len;
+      //        final_lines[idx] = line;
+      //    }
+      //}
+      cv::line(img_mat, cv::Point(line[0], line[1]), cv::Point(line[2], line[3]), cv::Scalar(0, 255), 3);
+  }
+
+  return img;
   
-  for (size_t i = 0; i < 2; i++) {
+  for (int i = 0; i < 2; i++) {
       if (lengths[i] > 0) {
           //printf("i: %lu -> %u \n", i, lengths[i]);
-          //cv::line(colored, cv::Point(final_lines[i][0], final_lines[i][1]), cv::Point(final_lines[i][2], final_lines[i][3]), cv::Scalar(0, 0, 255), 1);
+          cv::line(img_mat, cv::Point(final_lines[i][0], final_lines[i][1]), cv::Point(final_lines[i][2], final_lines[i][3]), cv::Scalar(0, 0, 255), 1);
       }
   }
 
   std::array<int, 2> center = {0, 0};
+  std::array<bool, IMAGE_WIDTH> free_space = {};
 
   // skip if both are 0
   if (lengths[0] || lengths[1]) {
@@ -295,8 +300,7 @@ static struct image_t *opencv_func(struct image_t *img, uint8_t camera_id __attr
           if(lengths[i] > 0) {
               int range_x[2] = {center[0] * i, center[0] * static_cast<int> (! static_cast<bool>(i)) + edges.cols * i};
               final_lines[i] = performLinearRegressionWithGuess(edges, final_lines[i], range_x);
-              cv::cvtColor(edges, colored, cv::COLOR_GRAY2BGR);
-              //cv::line(colored, cv::Point(final_lines[i][0], final_lines[i][1]), cv::Point(final_lines[i][2], final_lines[i][3]), cv::Scalar(0, 255, 0), 1);
+              //cv::line(img_mat, cv::Point(final_lines[i][0], final_lines[i][1]), cv::Point(final_lines[i][2], final_lines[i][3]), cv::Scalar(0, 255, 0), 1);
               int x1 = final_lines[i][0], y1 = final_lines[i][1], x2 = final_lines[i][2], y2 = final_lines[i][3];
               float dydx = static_cast<float>(y2 - y1) / static_cast<float>(x2 - x1);
               for (int x = x1; x <= x2; x += 5) {
@@ -304,26 +308,29 @@ static struct image_t *opencv_func(struct image_t *img, uint8_t camera_id __attr
                   bool valid = false;
                   for (int j = -2; j <= 2; j++) {
                       int newY = y + j;
-                      colored.at<cv::Vec3b>(newY, x) == cv::Vec3b(255, 255, 255);
-                      if (newY >= 0 && newY < edges.rows && edges.at<uchar>(newY, x) == 255) {
+                      //img_mat.at<cv::Vec3b>(newY, x) == cv::Vec3b(255, 255, 255);
+                      img_mat.at<cv::Vec2b>(x, newY) == cv::Vec2b(255, 255);
+                      if (newY >= 0 && newY < edges.rows && edges.at<uchar>(x, newY) == 255) {
                           valid = true;
+                          free_space[x] = true;
+                          break;
                       }
                   }
                   if(!valid && y >= 0 && y < edges.rows) {
                       //printf("%u, %u \n", x, y);
-                      //colored.at<cv::Vec3b>(y, x) = cv::Vec3b(0, 0, 255);
+                      //img_mat.at<cv::Vec3b>(y, x) = cv::Vec3b(0, 0, 255);
                       cv::Point center(x, y);
-                      cv::circle(colored, center, 5, cv::Scalar(0, 0, 255), -1);
-                      //std::cout << x << y << colored.at<cv::Vec3b>(y - 7, x) << std::endl;
+                      cv::circle(img_mat, center, 5, cv::Scalar(0, 0, 255), -1);
                   }
               }
           }
       }
     }
 
-  
 
-  AbiSendMsgCNN_CONTROL_INPUTS(CNN_CONTROL_INPUTS_ID, 0.2, .6, 0.2);
+  std::array<float, 3> regions = {0, 0, 0};
+  fill_regions(regions, free_space);
+  AbiSendMsgCNN_CONTROL_INPUTS(CNN_CONTROL_INPUTS_ID, regions[2], regions[1], regions[0]);
 
 
   return img;
