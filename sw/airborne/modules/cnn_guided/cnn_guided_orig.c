@@ -287,7 +287,7 @@ void cnn_guided_periodic(void)
 
       if (InsideObstacleZone(WaypointX(WP_TRAJECTORY),WaypointY(WP_TRAJECTORY))){
         // add offset to head back into arena
-        increase_nav_heading(oag_heading_rate);
+        increase_nav_heading(1.35*oag_heading_rate);
         VERBOSE_PRINT("IM IN!!!. heading to %f, rad:%f\n", DegOfRad(current_heading), current_heading);
   
         // reset safe counter
