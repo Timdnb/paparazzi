@@ -11,7 +11,7 @@ def Find_T_drone_org(roll, pitch, yaw):
 
     #---PROPER VARIABLES---
     roll = 0#-roll 
-    pitch = 0#-pitch -np.radians(-5)
+    pitch = 0 #-pitch -np.radians(-5)
     #hard_coded yaw for calibration
     yaw_hard_coded_calibration = np.radians(153)   
     yaw = -(yaw - yaw_hard_coded_calibration)
@@ -163,6 +163,11 @@ projection_matrix  = np.array([[300,0,120,0],
                                [0,0,1,0],
                                [0,0,0,1]])
 
+# projection_matrix  = np.array([[500,0,120,0],
+#                                [0,500,260,0],
+#                                [0,0,1,0],
+#                                [0,0,0,1]])
+
 # Replace 'file_path.csv' with the actual path to your CSV file
 # file_path = './cyberzoo_poles_panels_mats/20190121-142943.csv'
 file_path = './sim_poles_panels_mats/20190121-161955.csv'
@@ -198,10 +203,10 @@ for i in range(0, x_col.shape[0]):
                           [-4.,-4.,0.,1.],
                           [4.,-4.,0.,1.],
                           [-4.,4.,0.,1.]])
-    # cor_coord_org = np.array([[-4,-4.,0.,1.],
-    #                       [-0.,-0.,0.,1.],
-    #                       [0.,-0.,0.,1.],
-    #                       [-0.,0.,0.,1.]])
+    # cor_coord_org = np.array([[5.22,1.43,0.,1.],
+    #                       [1.02,-5.35,0.,1.],
+    #                       [-5.74,-1.1,0.,1.],
+    #                       [-1.54,5.68,0.,1.]])
     if i == 0:
         print("org")
         print(cor_coord_org)

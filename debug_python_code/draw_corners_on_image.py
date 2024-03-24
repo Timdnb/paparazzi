@@ -32,7 +32,7 @@ for photo_index in range(min(int(uvs.shape[0] / FPS), len(files))):
 
     # Iterate over coordinates from uvs and draw circles on the image
     for uv in uvs[math.ceil(photo_index * FPS)]:
-        x, y = 240-int(uv[0]), int(uv[1]) # Assuming uvs contains (x, y) coordinates
+        x, y = 240 - int(uv[0]), int(uv[1]) # Assuming uvs contains (x, y) coordinates
         #, y = 230,500
         cv2.circle(image, (x, y), 5, (0, 0, 255), -1)  # Draw a circle with radius 5 and red color
 
