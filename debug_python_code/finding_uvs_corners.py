@@ -108,33 +108,7 @@ def project_points(projection_matrix, corners_drone):
     return: Nx[u,v] rounded coordinates of the points in the camera image as int data type.
     """
 
-    # # print("corn",corners_drone)
-    # assert corners_drone.shape[-1] == 4
-    # uvs = None   # calculate points in image plane
-    
-    # coordinates = np.dot(projection_matrix, corners_drone.T).T
-    # coordinates = coordinates[:, :2] / coordinates[:, 2:] #normalisation
-
-    # #giving uvs shape [4,2]
-    # uvs = coordinates[:, :2]
-    # uvs = np.round(uvs).astype(int)
-
-    
-
-    #----------------------automated----------
-    # assert corners_drone.shape[-1] == 4
-    
-    # # Project points to camera image
-    # coordinates = np.dot(projection_matrix, corners_drone.T).T
-    # coordinates = coordinates[:, :2] / coordinates[:, 2][:, np.newaxis]  # Normalization
-    
-    # # Round and convert coordinates to integer
-    # uvs = np.round(coordinates).astype(int)
-
-    # return uvs
-
-
-    #-------------------------Miquel / the correct projection------------------
+    #-------------------------Miquel / the corrected projection------------------
     assert corners_drone.shape[-1] == 4
     uvs = []
     # points = points[:,:3]
@@ -214,6 +188,7 @@ for i in range(0, x_col.shape[0]):
     cor_coord_org[:,0] = cor_coord_org[:,0] - x_col[i] 
     cor_coord_org[:,1] = cor_coord_org[:,1] - y_col[i] 
     cor_coord_org[:,2] = cor_coord_org[:,2] - z_col[i]
+
     if i == 0:
         print("org after translation")
         print(cor_coord_org)
