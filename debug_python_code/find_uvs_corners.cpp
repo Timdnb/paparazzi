@@ -23,9 +23,11 @@ std::vector<std::vector<int>> project_points(std::vector<std::vector<float>> pro
         }
 
         // Round the coordinates to integers
+        
         for (int i = 0; i < 2; ++i) {
-            uv[i] = std::round(projected_points_homogeneous[i]);
+            uv[i] = static_cast<int>(std::round(projected_points_homogeneous[i]));
         }
+
 
         uvs.push_back(uv);
     }
@@ -38,9 +40,14 @@ int main() {
     std::vector<std::vector<float>> projection_matrix = {{300.0f, 0.0f, 120.0f, 0.0f},
                                                          {0.0f, 300.0f, 260.0f, 0.0f},
                                                          {0.0f, 0.0f, 1.0f, 0.0f}};
-    std::vector<std::vector<float>> point_3D = {{4.0f, 4.0f, 0.0f, 1.0f},
-                                                      {-4.0f, -4.0f, 0.0f, 1.0f},
-                                                      {4.0f, -4.0f, 0.0f, 1.0f}};
+    //here corners are given as in drone frame
+    //std::vector<std::vector<float>> point_3D = {{4.0f, 4.0f, 0.0f, 1.0f},
+    //                                                  {-4.0f, -4.0f, 0.0f, 1.0f},
+    //                                                  {4.0f, -4.0f, 0.0f, 1.0f}};
+    // here corners are given as in camera frame
+    std::vector<std::vector<float>> point_3D = {{0.0f, 4.0f, 4.0f, 1.0f},
+                                                      {0.0f, -4.0f, -4.0f, 1.0f},
+                                                      {0.0f, 4.0f, -4.0f, 1.0f}};
 
     std::vector<std::vector<int>> uvs = project_points(projection_matrix, point_3D);
 
