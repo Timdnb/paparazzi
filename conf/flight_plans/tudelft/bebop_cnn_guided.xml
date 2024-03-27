@@ -32,14 +32,22 @@ inline void setGuided(void){
     <waypoint lat="51.990640" lon="4.376734" name="_OZ2"/>
     <waypoint lat="51.990667" lon="4.376804" name="_OZ3"/>
     <waypoint lat="51.990623" lon="4.376850" name="_OZ4"/>
-    <waypoint x="3" y="0" name="_OZC1"/>
-    <waypoint x="2.121" y="2.121" name="_OZC2"/>
-    <waypoint x="0" y="3" name="_OZC3"/>
-    <waypoint x="-2.121" y="2.121" name="_OZC4"/>
-    <waypoint x="-3" y="0" name="_OZC5"/>
-    <waypoint x="-2.121" y="-2.121" name="_OZC6"/>
-    <waypoint x="0" y="-3" name="_OZC7"/>
-    <waypoint x="2.121" y="-2.121" name="_OZC8"/>
+    <waypoint x="3.464" y="0" name="_OZC1"/>
+    <waypoint x="3.2" y="1.325" name="_OZC2"/>
+    <waypoint x="2.45" y="2.45" name="_OZC3"/>
+    <waypoint x="1.325" y="3.2" name="_OZC4"/>
+    <waypoint x="0" y="3.464" name="_OZC5"/>
+    <waypoint x="-1.325" y="3.2" name="_OZC6"/>
+    <waypoint x="-2.45" y="2.45" name="_OZC7"/>
+    <waypoint x="-3.2" y="1.325" name="_OZC8"/>
+    <waypoint x="-3.464" y="0" name="_OZC9"/>
+    <waypoint x="-3.2" y="-1.325" name="_OZC10"/>
+    <waypoint x="-2.45" y="-2.45" name="_OZC11"/>
+    <waypoint x="-1.325" y="-3.2" name="_OZC12"/>
+    <waypoint x="0" y="-3.464" name="_OZC13"/>
+    <waypoint x="1.325" y="-3.2" name="_OZC14"/>
+    <waypoint x="2.45" y="-2.45" name="_OZC15"/>
+    <waypoint x="3.2" y="-1.325" name="_OZC16"/>
   </waypoints>
   <sectors>
     <sector color="red" name="CyberZoo">
@@ -63,6 +71,14 @@ inline void setGuided(void){
       <corner name="_OZC6"/>
       <corner name="_OZC7"/>
       <corner name="_OZC8"/>
+      <corner name="_OZC9"/>
+      <corner name="_OZC10"/>
+      <corner name="_OZC11"/>
+      <corner name="_OZC12"/>
+      <corner name="_OZC13"/>
+      <corner name="_OZC14"/>
+      <corner name="_OZC15"/>
+      <corner name="_OZC16"/>
     </sector>
   </sectors>
   <exceptions>
