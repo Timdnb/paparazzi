@@ -37,6 +37,9 @@ float right_conf = 0.f;
 float left_conf = 0.f;
 float speed_conf = 1.f;
 
+// initialize speed at 0
+float speed = 0.f;
+
 // create memory variables
 int times_left = 0;
 int times_right = 0;
@@ -48,14 +51,14 @@ int times_reentering = 0;
 float radius = 0.f;
 
 // periodic function frequency
-int frequency = 8;
+int frequency = 8; // should have the same frequency as cnn_guided_periodic (defined in cnn_guided.xml)
 
 // callback function to save control inputs
 #ifndef CNN_CONTROL_INPUTS_ID
 #error "CNN_CONTROL_INPUTS_ID is not defined"
 #endif
 
-static abi_event cnn_control; // create message variable __attribute__((unused))
+static abi_event cnn_control;
 static void save_control_inputs(uint8_t __attribute__((unused)) sender_id, float left, float forward, float right)
 {
   left_conf = left;
@@ -89,16 +92,17 @@ bool out_of_bounds(float *speed_conf) {
   float y_pos = stateGetPositionEnu_f()->y;
   float r = x_pos * x_pos + y_pos * y_pos;  // not taking the square root to save computation time
 
-  if (r < 6) {
+  // Assign speed_conf based on distance to center, prevents overshoot into red zone
+  if (r < 8) {
     *speed_conf = 1;
-  } else if (r < 7) {
-    *speed_conf = 0.8;
-  } else if (r < 8) {
-    *speed_conf = 0.6;
   } else if (r < 9) {
+    *speed_conf = 0.8;
+  } else if (r < 10) {
+    *speed_conf = 0.6;
+  } else if (r < 11) {
     *speed_conf = 0.4;
   } else
-  if (r > 9) {
+  if (r > 12) {
     return true;
   }
   return false;
@@ -129,17 +133,20 @@ void cnn_guided_periodic(void)
 
   switch (navigation_state){
     case STATIONARY:
+    // STATIONARY logic: stop and set heading rate to 0, then update navigation state
       guidance_h_set_body_vel(0, 0);
       guidance_h_set_heading_rate(RadOfDeg(0));
       update_navigation_state(forward_conf, right_conf, left_conf, &navigation_state, &times_forward, &times_left, &times_right, &radius);
 
     case FORWARD:
-      float speed = speed_conf*fmin(oag_max_speed, (base_speed_fraction + forward_conf) * oag_max_speed);
+    // FORWARD logic: set forward speed to base speed + the max speed times the confidence value, then update navigation state
+      speed = speed_conf*fmin(oag_max_speed, (base_speed_fraction + forward_conf) * oag_max_speed);
       guidance_h_set_body_vel(speed, 0);
       update_navigation_state(forward_conf, right_conf, left_conf, &navigation_state, &times_forward, &times_left, &times_right, &radius);
 
       break;
     case LEFT:
+    // LEFT logic: set forward speed to base speed and turn left, then update navigation state
       guidance_h_set_body_vel(base_speed_fraction*oag_max_speed, 0);
       guidance_h_set_heading_rate(-oag_heading_rate);
       times_left++;
@@ -147,6 +154,7 @@ void cnn_guided_periodic(void)
 
       break;
     case RIGHT: 
+    // RIGHT logic: set forward speed to base speed and turn right, then update navigation state
       guidance_h_set_body_vel(base_speed_fraction*oag_max_speed, 0);
       guidance_h_set_heading_rate(oag_heading_rate);
       times_right++;
@@ -154,6 +162,7 @@ void cnn_guided_periodic(void)
 
       break;
     case OUT_OF_BOUNDS:
+    // OUT_OF_BOUNDS logic: stop, turn 180 degrees, go into REENTER_ARENA
       guidance_h_set_body_vel(0, 0);
       guidance_h_set_heading_rate(avoidance_heading_direction * 2 * oag_heading_rate);
       times_out_of_bounds++;
@@ -165,6 +174,7 @@ void cnn_guided_periodic(void)
 
       break;
     case REENTER_ARENA:
+    // REENTER_ARERA logic: stop turning, go forward and check if we are back in the arena, if yes, go back to FORWARD
       guidance_h_set_heading_rate(RadOfDeg(0));
       guidance_h_set_body_vel(2*base_speed_fraction*oag_max_speed, 0);
       times_reentering++;
@@ -184,11 +194,10 @@ void cnn_guided_periodic(void)
 
 
 /*
- * Sets the variable 'incrementForAvoidance' randomly positive/negative
+ * Sets the variable avoidance_heading_direction randomly positive/negative
  */
 uint8_t random_direction(void)
 {
-  // Randomly choose CW or CCW avoiding direction
   avoidance_heading_direction = (rand() % 2 == 0) ? 1.f : -1.f;
   return false;
 }
