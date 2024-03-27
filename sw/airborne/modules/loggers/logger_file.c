@@ -81,7 +81,6 @@ static void logger_file_write_header(FILE *file) {
 #else
   fprintf(file, "h_ctl_aileron_setpoint,h_ctl_elevator_setpoint\n");
 #endif
-  
 }
 
 /** Write CSV row
@@ -116,7 +115,6 @@ static void logger_file_write_row(FILE *file) {
 #else
   fprintf(file, "%d,%d\n", h_ctl_aileron_setpoint, h_ctl_elevator_setpoint);
 #endif
-  
 }
 
 

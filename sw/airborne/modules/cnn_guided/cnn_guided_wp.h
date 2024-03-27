@@ -7,14 +7,16 @@
 /**
  * @file "modules/cnn_guided/cnn_guided.h"
  * @author Tim den Blanken
- * Header file for cnn guided module
+ * TO COME
  */
 
 #ifndef CNN_GUIDED_H
 #define CNN_GUIDED_H
 
+
 // Add the enum declaration here
 enum navigation_state_t {
+  PATH_FOLLOWING,
   FORWARD,
   LEFT,
   RIGHT,
@@ -26,9 +28,8 @@ enum navigation_state_t {
 // settings
 extern float oag_max_speed;         // max flight speed [m/s]
 extern float oag_heading_rate;      // heading rate setpoint [rad/s]
-extern float base_speed_fraction;   // base_speed = oag_max_speed * base_speed_fraction
 
-// External declarations to access the confidence values for logger file
+// External declarations to access the confidence values
 extern float forward_conf;
 extern float right_conf;
 extern float left_conf; 
@@ -36,7 +37,7 @@ extern float left_conf;
 extern void cnn_guided_init(void);
 extern void cnn_guided_periodic(void);
 
-void update_navigation_state(float forward_conf, float right_conf, float left_conf, enum navigation_state_t* navigation_state, int* times_forward, int* times_left, int* times_right, float* radius);
+void update_navigation_state(float forward_conf, float right_conf, float left_conf);
 
 #endif /* CNN_GUIDED_H */
 

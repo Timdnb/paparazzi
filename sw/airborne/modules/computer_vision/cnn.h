@@ -30,15 +30,13 @@
 #include "modules/computer_vision/cv.h"
 
 // Tensor dimensions
-// #define TENSOR_HEIGHT 130
-// #define TENSOR_WIDTH 60
-#define TENSOR_HEIGHT 26
+#define TENSOR_HEIGHT 40
 #define TENSOR_WIDTH 12
 
 // Module functions
 extern void cnn_init(void);
 
-void entry(const float tensor_input_1[1][1][26][12], float tensor_19[1][3]);
+void entry(const float tensor_input_1[1][1][40][12], float tensor_19[1][3]);
 
 void convert_image_to_tensor(struct image_t *image, float tensor_input[1][1][TENSOR_HEIGHT][TENSOR_WIDTH]);
 
