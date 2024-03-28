@@ -122,7 +122,7 @@ void convert_image_to_tensor(struct image_t *image, float tensor_input_1[1][1][T
         for (int j = 0; j < TENSOR_WIDTH; j++) {
             int row_idx = i * (520 / TENSOR_HEIGHT);
             int col_idx = j * (120 / TENSOR_WIDTH) + 60;
-            tensor_input_1[0][0][i][j] = (intermediate[0][0][row_idx][col_idx] - 0.3625994920730591) / 0.18103595077991486;
+            tensor_input_1[0][0][i][j] = (intermediate[0][0][row_idx][col_idx] - MEAN) / STD;
         }
     }
 }

@@ -33,6 +33,10 @@
 #define TENSOR_HEIGHT 40
 #define TENSOR_WIDTH 12
 
+// Dataset mean and std
+#define MEAN 0.3625994920730591
+#define STD 0.18103595077991486
+
 // Module functions
 extern void cnn_init(void);
 
