@@ -21,6 +21,7 @@
 
 /**
  * @file modules/computer_vision/cnn.c
+ * @author Tim den Blanken
  */
 
 // Own header
@@ -118,6 +119,7 @@ void convert_image_to_tensor(struct image_t *image, float tensor_input_1[1][1][T
         }
 
     // then extract the region of interest
+    // here it downsamples to the intended size, crops the top and bottom 25% and normalizes the images
     for (int i = 0; i < TENSOR_HEIGHT; i++) {
         for (int j = 0; j < TENSOR_WIDTH; j++) {
             int row_idx = i * (520 / TENSOR_HEIGHT);

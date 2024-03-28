@@ -21,6 +21,7 @@
 
 /**
  * @file modules/computer_vision/cnn.h
+ * @author Tim den Blanken
  */
 
 #ifndef CNN_H
@@ -40,6 +41,7 @@
 // Module functions
 extern void cnn_init(void);
 
+// Update the tensor_input_1 dimension to match the tensor dimension of the image
 void entry(const float tensor_input_1[1][1][40][12], float tensor_19[1][3]);
 
 void convert_image_to_tensor(struct image_t *image, float tensor_input[1][1][TENSOR_HEIGHT][TENSOR_WIDTH]);
