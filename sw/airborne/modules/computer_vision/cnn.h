@@ -22,6 +22,7 @@
 /**
  * @file modules/computer_vision/cnn.h
  * @author Tim den Blanken
+ * Header file for cnn module
  */
 
 #ifndef CNN_H
@@ -30,11 +31,14 @@
 #include <stdint.h>
 #include "modules/computer_vision/cv.h"
 
-// Tensor dimensions
+// Tensor input dimensions (corresponds to image dimensions)
 #define TENSOR_HEIGHT 40
 #define TENSOR_WIDTH 12
 
-// Dataset mean and std
+// Number of output classes
+#define OUTPUT_CLASSES 3
+
+// Dataset mean and std, set MEAN to 0 and STD to 1 if normalized images are not used
 #define MEAN 0.3625994920730591
 #define STD 0.18103595077991486
 
@@ -42,6 +46,7 @@
 extern void cnn_init(void);
 
 // Update the tensor_input_1 dimension to match the tensor dimension of the image
+// IMPORTANT: make sure to match function declaration below to the used image and output dimensions
 void entry(const float tensor_input_1[1][1][40][12], float tensor_19[1][3]);
 
 void convert_image_to_tensor(struct image_t *image, float tensor_input[1][1][TENSOR_HEIGHT][TENSOR_WIDTH]);
