@@ -87,20 +87,30 @@ static void save_control_inputs(uint8_t __attribute__((unused)) sender_id, float
 // Control navigation state
 void update_navigation_state(float forward_conf, float right_conf, float left_conf, enum navigation_state_t* navigation_state) {
   if (out_of_bounds(&speed_conf)) {
+    if (*navigation_state != OUT_OF_BOUNDS) {
+      printf("Out of bounds\n");
+    }
     *navigation_state = OUT_OF_BOUNDS;
-    printf("Out of bounds\n");
   } else if (forward_conf > right_conf && forward_conf > left_conf) {
+    if (*navigation_state != FORWARD) {
+      printf("Forward\n");
+    }
     *navigation_state = FORWARD;
-    printf("Forward\n");
   } else if (right_conf > forward_conf && right_conf > left_conf) {
+    if (*navigation_state != RIGHT) {
+      printf("Right\n");
+    }
     *navigation_state = RIGHT;
-    printf("Right\n");
   } else if (left_conf > forward_conf && left_conf > right_conf) {
+    if (*navigation_state != LEFT) {
+      printf("Left\n");
+    }
     *navigation_state = LEFT;
-    printf("Left\n");
   } else {
+    if (*navigation_state != STATIONARY) {
+      printf("Stationary\n");
+    }
     *navigation_state = STATIONARY;
-    printf("Stationary\n");
   }
 }
 
@@ -111,6 +121,7 @@ bool out_of_bounds(float *speed_conf) {
   float r = x_pos * x_pos + y_pos * y_pos;  // not taking the square root to save some computation time
 
   // Assign speed_conf based on distance to center, prevents overshoot into red zone
+  // The obstacle zone, now defined with radius sqrt(12), can be seen in blue in GCS
   if (r < 8) {
     *speed_conf = 1;
   } else if (r < 9) {
