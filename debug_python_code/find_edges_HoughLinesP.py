@@ -10,7 +10,7 @@ example_files = os.listdir('./cyberzoo_poles_panels_mats/20190121-142935')
 example_files.sort()
 example_files = [os.path.join('./cyberzoo_poles_panels_mats/20190121-142935', filename) for filename in example_files]
 
-def remove_mess(image, window_size=10, thresh=.4):
+def remove_mess(image, window_size=15, thresh=.35):
     pixels_threshold = window_size**2 * thresh
     for y in range(0, image.shape[0] - window_size + 1, window_size):
         for x in range(0, image.shape[1] - window_size + 1, window_size):
@@ -18,7 +18,7 @@ def remove_mess(image, window_size=10, thresh=.4):
             roi = image[y:y+window_size, x:x+window_size]
             
             # Count white pixels 
-            white_pixels = np.sum(roi == 255) * 3
+            white_pixels = np.sum(roi == 255)
             
             # If there are 20 or more white pixels, replace the entire ROI with black pixels
             if white_pixels >= pixels_threshold:
@@ -108,7 +108,7 @@ while not exit:
     edges = remove_mess(edges)
     colored = cv2.cvtColor(edges, cv2.COLOR_GRAY2BGR)
     y_min = 120
-    lines = cv2.HoughLinesP(edges[y_min:, :], 1, 5 * np.pi/180, 10, minLineLength=100, maxLineGap=30)
+    lines = cv2.HoughLinesP(edges[y_min:, :], 1, 1 * np.pi/180, 10, minLineLength=30, maxLineGap=10)
     if lines is not None:
         for line in lines:
             for x1, y1, x2, y2 in line:
