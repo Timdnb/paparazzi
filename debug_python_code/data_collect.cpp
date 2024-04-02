@@ -6,6 +6,10 @@ g++ -std=c++17 data_collect.cpp -o data_collect -I/usr/local/include/opencv4 -L/
 -lopencv_stitching -lopencv_core -lopencv_highgui -lopencv_imgproc \
 -lopencv_imgcodecs -lopencv_videoio -lopencv_calib3d -lopencv_features2d \
 -lopencv_objdetect -lopencv_dnn
+
+
+RUN:
+./data_collect ./cyberzoo_poles_panels_mats/20190121-142935/
 */
 
 // namespace fs = std::filesystem;
