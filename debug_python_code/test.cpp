@@ -10,7 +10,7 @@ This code will go to paparazzi when opencv works in paparazzi.
 
 
 COMPILE:
-g++ test.cpp -o test -I/usr/include/opencv4 -lopencv_stitching -lopencv_alphamat
+g++ test.cpp -o test -I/usr/local/include/opencv4 -lopencv_stitching -lopencv_alphamat
  -lopencv_aruco -lopencv_barcode -lopencv_bgsegm -lopencv_bioinspired -lopencv_c
 calib -lopencv_dnn_objdetect -lopencv_dnn_superres -lopencv_dpm -lopencv_face -l
 opencv_freetype -lopencv_fuzzy -lopencv_hdf -lopencv_hfs -lopencv_img_hash -lope
@@ -303,8 +303,8 @@ int main(int argc, char** argv) {
                             colored.at<cv::Vec3b>(newY, x) == cv::Vec3b(255, 255, 255);
                             if (newY >= 0 && newY < edges.rows && edges.at<uchar>(newY, x) == 255) {
                                 valid = true;
-                                free_space[x] = true
-                                break
+                                free_space[x] = true;
+                                break;
                             }
                         }
                         if(!valid && y >= 0 && y < edges.rows) {
