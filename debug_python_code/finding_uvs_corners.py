@@ -3,25 +3,17 @@ import pandas as pd
 
 
 def Find_T_drone_org(roll, pitch, yaw):
+#finding homogenous transformation matrix from original cyberzoo frame to drone frame
 
-    #because input is expressed as rotation and translation from original to drone we need to
-    #add minus in front so that we actually know what should be the coordinates in the drone frame 
-    #if the points were transformed from drone to original frame. Thus we can know that the drone
-    #would see in its frame
+    #---ANGLE VARIABLES---
+    #because input is expressed as rotation and translation from original to drone frame we need to add minus in front of variables
+    roll = -roll 
+    pitch = -pitch 
 
-    #---PROPER VARIABLES---
-    roll = 0#-roll 
-    pitch = 0 #-pitch -np.radians(-5)
-    #hard_coded yaw for calibration
+    #hard_coded yaw for calibration at the starting postion
     yaw_hard_coded_calibration = np.radians(153)   
     yaw = -(yaw - yaw_hard_coded_calibration)
 
-    #---DEBUGGING/PROOF OF WORKING---
-    # yaw = np.radians(45)
-    # roll = 0
-    # pitch = 0
-    # yaw = 0 - yaw_hard_coded_calibration
- 
     # Convert Euler angles to rotation matrices
     R_roll = np.array([[1, 0, 0],
                     [0, np.cos(roll), -np.sin(roll)],
@@ -37,9 +29,6 @@ def Find_T_drone_org(roll, pitch, yaw):
 
     # Combine individual rotation matrices to obtain the overall rotation matrix
     rotation_matrix = np.dot(np.dot(R_yaw, R_pitch), R_roll)
-    #checking the order impact
-    # rotation_matrix = np.dot(R_pitch, np.dot(R_roll, R_yaw))
-
 
     # Translation is taken care outside the function
     translation_vector = np.array([0, 0, 0])  
@@ -56,20 +45,12 @@ def Find_T_drone_org(roll, pitch, yaw):
 
 
 def Find_T_camera_drone():
+#creating homogenous transofrmation matrix from drone frame to camera frame
 
-    #minus because we go back to give coordinates in camera frame for points positioned as in 
-    #drone frame
-
+    #adding minus for angle variables
+    #the rotation makes sure the z dimension is in the image plane
     y_rot = - np.radians(90)
     x_rot =  - np.radians(0)
-
-    #DEBUGGING / DEFAULT CAMERA FRAME IN NORMAL CASE
-    # y_rot = -np.radians(0)
-    # z_rot = -np.radians(0)
-
-    # y_rot = -np.radians(90)
-    # z_rot = -np.radians(0)
-    
 
     # Convert Euler angles to rotation matrices
     R_roll = np.array([[1, 0, 0],
@@ -80,17 +61,11 @@ def Find_T_camera_drone():
                         [0, 1, 0],
                         [-np.sin(y_rot), 0, np.cos(y_rot)]])
     
-    # R_yaw = np.array([[np.cos(z_rot), -np.sin(z_rot), 0],
-    #                 [np.sin(z_rot), np.cos(z_rot), 0],
-    #                 [0, 0, 1]])
-    
-    #Find correct order for rotations
+    #order for rotations
     rotation_matrix = np.dot( R_pitch , R_roll)
-    # rotation_matrix = np.dot( R_yaw , R_pitch)
+
     
-
     #forming homogenous matrix, no translation
-
     homogeneous_matrix = np.zeros([4,4])
     homogeneous_matrix[:3, :3] = rotation_matrix
     homogeneous_matrix[3, :] = np.array([0,0,0,1])
@@ -102,13 +77,14 @@ def Find_T_camera_drone():
 
 
 def project_points(projection_matrix, corners_drone):
+#finding uv position in the image based on the coordinates in camera frame and projection matrix
     """
     projection_matrix: The projection matrix based on the intrinsic camera calibration.
     points: Nx[x,y,z,1.0] np.array of the points that need to be projected to the camera image from drone frame.
     return: Nx[u,v] rounded coordinates of the points in the camera image as int data type.
     """
 
-    #-------------------------Miquel / the corrected projection------------------
+    #-------------------------the corrected projection------------------
     assert corners_drone.shape[-1] == 4
     uvs = []
     # points = points[:,:3]
@@ -126,6 +102,13 @@ def project_points(projection_matrix, corners_drone):
     
     return uvs
 
+def rel_3D_to_2D(point):
+#find uvs from corner cooridnates in drone frame (after drone translation and rotation)
+    T_camera_drone = Find_T_camera_drone()
+    cor_coord_camera = np.dot(T_camera_drone, point.T).T
+    uvs_row = project_points(projection_matrix, cor_coord_camera)
+    return uvs_row
+
 
 
 #---------------------------MAIN-----------------------------------------------------------------
@@ -137,12 +120,7 @@ projection_matrix  = np.array([[300,0,120,0],
                                [0,0,1,0],
                                [0,0,0,1]])
 
-# projection_matrix  = np.array([[500,0,120,0],
-#                                [0,500,260,0],
-#                                [0,0,1,0],
-#                                [0,0,0,1]])
-
-# Replace 'file_path.csv' with the actual path to your CSV file
+# Replace 'file_path.csv' with the actual path to the CSV file
 # file_path = './cyberzoo_poles_panels_mats/20190121-142943.csv'
 file_path = './sim_poles_panels_mats/20190121-161955.csv'
 
@@ -162,12 +140,6 @@ yaw_col = df.iloc[:, 9]
 #definig final array for corner pixel coordinates (3D)
 uvs = np.zeros((x_col.shape[0],4, 2))
 
-def rel_3D_to_2D(point):
-    #Find Transformation matrix from orginial frame to drone (only rotation though)
-    T_camera_drone = Find_T_camera_drone()
-    cor_coord_camera = np.dot(T_camera_drone, point.T).T
-    uvs_row = project_points(projection_matrix, cor_coord_camera)
-    return uvs_row
 
 #main loop for finding all 4 corners for a datapoint
 for i in range(0, x_col.shape[0]):
@@ -177,10 +149,6 @@ for i in range(0, x_col.shape[0]):
                           [-4.,-4.,0.,1.],
                           [4.,-4.,0.,1.],
                           [-4.,4.,0.,1.]])
-    # cor_coord_org = np.array([[5.22,1.43,0.,1.],
-    #                       [1.02,-5.35,0.,1.],
-    #                       [-5.74,-1.1,0.,1.],
-    #                       [-1.54,5.68,0.,1.]])
     if i == 0:
         print("org")
         print(cor_coord_org)
@@ -202,6 +170,7 @@ for i in range(0, x_col.shape[0]):
         print("org after rotation")
         print(cor_coord_drone)
 
+    #find uvs from corner cooridnates in drone frame (after drone translation and rotation)
     uvs_row = rel_3D_to_2D(cor_coord_drone)
 
     #fill a row in the final uvs matrix
@@ -213,16 +182,16 @@ for i in range(0, x_col.shape[0]):
     # Save the array to the specified file path
     np.save("./saved_numpy.npy", uvs_testing)
 
-print(uvs_testing[0])
+# print(uvs_testing[0])
 
-def draw_3D_to_2D(frame):
-    T_drone_org = np.eye(4)
-    cor_coord_drone = np.dot(T_drone_org, np.array([2, 1, 0]).T).T
-    T_camera_drone = Find_T_camera_drone()
-    cor_coord_camera = np.dot(T_camera_drone, cor_coord_drone.T).T
-    uv = project_points(projection_matrix,cor_coord_camera)[:2]
-    print(uv)
-    y, x = 240- int(uv[0]), int(uv[1])  # Assuming uvs contains (x, y) coordinates
-    # y, x = int(220), int(400)
-    cv2.circle(frame, (y, x), 5, (0, 0, 255), -1)  # Draw a circle with radius 5 and red color
-    return uvs
+# def draw_3D_to_2D(frame):
+#     T_drone_org = np.eye(4)
+#     cor_coord_drone = np.dot(T_drone_org, np.array([2, 1, 0]).T).T
+#     T_camera_drone = Find_T_camera_drone()
+#     cor_coord_camera = np.dot(T_camera_drone, cor_coord_drone.T).T
+#     uv = project_points(projection_matrix,cor_coord_camera)[:2]
+#     print(uv)
+#     y, x = 240- int(uv[0]), int(uv[1])  # Assuming uvs contains (x, y) coordinates
+#     # y, x = int(220), int(400)
+#     cv2.circle(frame, (y, x), 5, (0, 0, 255), -1)  # Draw a circle with radius 5 and red color
+#     return uvs
