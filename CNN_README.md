@@ -21,3 +21,6 @@ Below all files are listed that have either been added or modified in order to r
 #### Modified files
 - `paparazzi/conf/userconf/tudelft/course_conf.xml`
     - added a new aircraft
+
+#### CNN training code
+All CNN training efforts have been done in Python, before translating the final model to C. All code including explanations for reproduction can be found in a [separate repository](https://github.com/Timdnb/CNN-for-Micro-Air-Vehicles).
