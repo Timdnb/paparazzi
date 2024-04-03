@@ -1,3 +1,4 @@
+# Attempt to get the corners of the cyberZoo with the camera projection matrix
 import cv2
 import matplotlib.pyplot as plt
 import os

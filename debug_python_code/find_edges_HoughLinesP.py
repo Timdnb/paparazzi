@@ -1,3 +1,4 @@
+### Quick file for prototyping of the openCV approach using Hough lines
 import cv2
 import matplotlib.pyplot as plt
 import os

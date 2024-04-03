@@ -1,9 +1,14 @@
+
 #include <opencv2/opencv.hpp>
 #include <opencv2/highgui/highgui_c.h>
 #include <iostream>
 #include <filesystem>
 
 /*
+
+This code will go to paparazzi when opencv works in paparazzi.
+
+
 COMPILE:
 g++ test.cpp -o test -I/usr/include/opencv4 -lopencv_stitching -lopencv_alphamat
  -lopencv_aruco -lopencv_barcode -lopencv_bgsegm -lopencv_bioinspired -lopencv_c

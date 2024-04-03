@@ -21,6 +21,24 @@
 
 /**
  * @file modules/computer_vision/opencv_approach.c
+ * This file contins the vision part of the openCV approach by group 3
+ * The main input is the camera image, 
+ * The output is the confidence interval of left/forward/right.
+ * 
+ * FUNCTIONALITY:
+ * Every time the camera takes an image, it calls opencv_func()
+ * The image is changed from YUV to a openCV Mat
+ * Then it s blurred and passed through a Canny edge detector
+ * To remove excess noise, the image is passed through remove_mess().
+ * Then HoughLinesP() is called, which looks for long (possibly interrumpted) lines, and interpolates the missing parts
+ * Vertical lines are discarded, and then the lines are filtered to get the edges of the cyberzoo
+ * 
+ * The "interpolations" from Hough represent obstacles.  
+ * Obstacle-free space can be represented as the spaces where there is no interpolations
+ * The image is divided into three parts. 
+ * Finally, the confidence intervals are calculates, by the proportion of free space in each section. 
+ * 
+ * 
  */
 
 // Own header
@@ -36,9 +54,6 @@
 #ifndef CNN_FPS
 #define CNN_FPS 0 ///< Default FPS (zero means run at camera fps)
 #endif
-
-
-
 
 
 using namespace std;
